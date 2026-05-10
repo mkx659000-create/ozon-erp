@@ -31,7 +31,7 @@ request.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
       window.location.href = '/login';
-    } else {
+    } else if (error.code !== 'ERR_NETWORK' && error.response) {
       const msg =
         error.response?.data?.message || error.message || '网络错误';
       message.error(msg);

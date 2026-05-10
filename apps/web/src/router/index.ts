@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
-import productRoutes from './routes/modules/product';
-import promotionRoutes from './routes/modules/promotion';
 
 const Layout = () => import('@/views/_core/layout/index.vue');
 
@@ -23,8 +21,27 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: { title: '首页' },
       },
-      ...productRoutes.flatMap((r) => r.children || []),
-      ...promotionRoutes.flatMap((r) => r.children || []),
+      // Product routes
+      {
+        path: 'product/online',
+        name: 'ProductOnline',
+        component: () => import('@/views/product/online/index.vue'),
+        meta: { title: 'OZON在线产品' },
+      },
+      {
+        path: 'product/publish',
+        name: 'ProductPublish',
+        component: () => import('@/views/product/publish/index.vue'),
+        meta: { title: 'OZON产品刊登' },
+      },
+      // Promotion routes
+      {
+        path: 'promotion/activities',
+        name: 'PromotionActivities',
+        component: () => import('@/views/promotion/index.vue'),
+        meta: { title: 'OZON促销活动' },
+      },
+      // Store management
       {
         path: 'store-accounts',
         name: 'StoreAccounts',
@@ -48,5 +65,3 @@ router.beforeEach((to, _from, next) => {
     next('/login');
   }
 });
-
-export { productRoutes, promotionRoutes };

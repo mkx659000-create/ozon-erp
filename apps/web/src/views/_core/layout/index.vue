@@ -41,11 +41,14 @@ onMounted(async () => {
     try {
       await userStore.fetchProfile();
     } catch {
-      router.push('/login');
-      return;
+      // Backend not available, continue with layout render
     }
   }
-  await storeAccountStore.fetchStores();
+  try {
+    await storeAccountStore.fetchStores();
+  } catch {
+    // Backend not available
+  }
 });
 
 function handleMenuClick(info: any) {

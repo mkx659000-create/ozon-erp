@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted, watch, h } from 'vue';
 import {
   Card,
   Tabs,
@@ -13,6 +13,9 @@ import {
   DatePicker,
   Badge,
   Input,
+  Image,
+  message,
+  Popconfirm,
 } from 'ant-design-vue';
 import {
   SyncOutlined,
@@ -22,39 +25,204 @@ import {
   SettingOutlined,
   SearchOutlined,
 } from '@ant-design/icons-vue';
+import { useStoreAccountStore } from '@/store';
+import {
+  getPromotionProductsApi,
+  getStatusCountsApi,
+  syncPromotionsApi,
+  exitPromotionApi,
+  type PromotionProduct,
+  type StatusCounts,
+} from '@/api/promotion';
+import EditActivityModal from './components/EditActivityModal.vue';
+import dayjs from 'dayjs';
 
-const activeTab = ref('ALL');
+const storeAccountStore = useStoreAccountStore();
+
+/* ---- state ---- */
+const activeTab = ref<string>('ALL');
 const loading = ref(false);
+const syncLoading = ref(false);
+const dataSource = ref<PromotionProduct[]>([]);
+const total = ref(0);
+const currentPage = ref(1);
+const pageSize = ref(50);
 const selectedRowKeys = ref<string[]>([]);
+const keyword = ref('');
 
-const statusTabs = [
-  { key: 'ALL', label: '全部', count: 0 },
-  { key: 'JOINED', label: '已参加', count: 0 },
-  { key: 'NOT_JOINED', label: '未参加', count: 0 },
-];
+const statusCounts = ref<StatusCounts>({ total: 0, joined: 0, notJoined: 0 });
 
-const columns = [
-  { title: '主图', key: 'image', width: 80 },
-  { title: '标题/SKU/ProductID/店铺', key: 'info', width: 280 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
-  { title: '原价', dataIndex: 'originalPrice', key: 'originalPrice', width: 100 },
-  { title: '最低价', dataIndex: 'lowestPrice', key: 'lowestPrice', width: 100 },
-  { title: '促销价格', dataIndex: 'promoPrice', key: 'promoPrice', width: 100 },
-  { title: '在售/促销库', key: 'stock', width: 120 },
-  { title: '参加活动/方式', key: 'participation', width: 120 },
-  { title: '操作', key: 'action', width: 100 },
-  { title: '操作人', dataIndex: 'operator', key: 'operator', width: 80 },
-  { title: '活动时间', key: 'activityTime', width: 180 },
-  { title: '促销活动', dataIndex: 'activityName', key: 'activityName', width: 200 },
-];
+/* edit-activity modal */
+const editModalVisible = ref(false);
+const editPromotionId = ref('');
 
-const dataSource = ref([]);
+/* ---- computed ---- */
+const storeAccountId = computed(() => storeAccountStore.activeStoreId || '');
 
-const rowSelection = ref({
+const statusTabs = computed(() => [
+  { key: 'ALL', label: '全部', count: statusCounts.value.total },
+  { key: 'JOINED', label: '已参加', count: statusCounts.value.joined },
+  { key: 'NOT_JOINED', label: '未参加', count: statusCounts.value.notJoined },
+]);
+
+const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: any[]) => {
     selectedRowKeys.value = keys.map(String);
   },
+}));
+
+/* ---- columns ---- */
+const columns = [
+  { title: '主图', key: 'image', width: 70, fixed: 'left' as const },
+  { title: '标题 / SKU / ProductID / 店铺', key: 'info', width: 280, fixed: 'left' as const },
+  { title: '状态', key: 'status', width: 90 },
+  { title: '原价', key: 'originalPrice', width: 100 },
+  { title: '最低促销价', key: 'lowestPrice', width: 110 },
+  { title: '促销价格', key: 'promoPrice', width: 100 },
+  { title: '在售/促销库存', key: 'stock', width: 130 },
+  { title: '参加方式', key: 'participation', width: 100 },
+  { title: '活动时间', key: 'activityTime', width: 200 },
+  { title: '促销活动', key: 'activityName', width: 200 },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' as const },
+];
+
+/* ---- data fetching ---- */
+async function fetchData() {
+  loading.value = true;
+  try {
+    const params: any = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+    };
+    if (storeAccountId.value) params.storeAccountId = storeAccountId.value;
+    if (activeTab.value !== 'ALL') params.participationStatus = activeTab.value;
+    if (keyword.value) params.keyword = keyword.value;
+
+    const res = await getPromotionProductsApi(params);
+    dataSource.value = res.items;
+    total.value = res.total;
+  } catch {
+    // API may not be available yet
+    dataSource.value = [];
+    total.value = 0;
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function fetchCounts() {
+  try {
+    statusCounts.value = await getStatusCountsApi(storeAccountId.value || undefined);
+  } catch {
+    statusCounts.value = { total: 0, joined: 0, notJoined: 0 };
+  }
+}
+
+async function loadAll() {
+  await Promise.all([fetchData(), fetchCounts()]);
+}
+
+/* ---- actions ---- */
+async function handleSync() {
+  if (!storeAccountId.value) {
+    message.warning('请先选择店铺');
+    return;
+  }
+  syncLoading.value = true;
+  try {
+    const res = await syncPromotionsApi(storeAccountId.value);
+    message.success(`同步完成：成功 ${res.synced} 个活动，失败 ${res.failed} 个`);
+    await loadAll();
+  } catch {
+    message.error('同步失败');
+  } finally {
+    syncLoading.value = false;
+  }
+}
+
+function handleEditActivity() {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning('请先选择要编辑的商品');
+    return;
+  }
+  // Get the promotionId of the first selected row
+  const first = dataSource.value.find((d) => d.id === selectedRowKeys.value[0]);
+  if (first) {
+    editPromotionId.value = first.promotionId;
+    editModalVisible.value = true;
+  }
+}
+
+async function handleExitActivity() {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning('请先选择要退出的商品');
+    return;
+  }
+  if (!storeAccountId.value) {
+    message.warning('请先选择店铺');
+    return;
+  }
+  // Group by promotionId
+  const grouped: Record<string, string[]> = {};
+  for (const key of selectedRowKeys.value) {
+    const item = dataSource.value.find((d) => d.id === key);
+    if (item) {
+      if (!grouped[item.promotionId]) grouped[item.promotionId] = [];
+      grouped[item.promotionId].push(item.productId);
+    }
+  }
+  try {
+    for (const [promoId, productIds] of Object.entries(grouped)) {
+      await exitPromotionApi(promoId, storeAccountId.value, productIds);
+    }
+    message.success('退出活动成功');
+    selectedRowKeys.value = [];
+    await loadAll();
+  } catch {
+    message.error('退出活动失败');
+  }
+}
+
+function handleSearch() {
+  currentPage.value = 1;
+  fetchData();
+}
+
+function handleTabChange() {
+  currentPage.value = 1;
+  fetchData();
+}
+
+function handleTableChange(pagination: any) {
+  currentPage.value = pagination.current;
+  pageSize.value = pagination.pageSize;
+  fetchData();
+}
+
+function handleEditModalSave() {
+  editModalVisible.value = false;
+  loadAll();
+}
+
+function formatPrice(val: number | null | undefined) {
+  if (val === null || val === undefined) return '-';
+  return `₽ ${Number(val).toFixed(2)}`;
+}
+
+function formatDate(d: string | null) {
+  if (!d) return '-';
+  return dayjs(d).format('YYYY-MM-DD HH:mm');
+}
+
+/* ---- lifecycle ---- */
+onMounted(() => {
+  loadAll();
+});
+
+watch(storeAccountId, () => {
+  currentPage.value = 1;
+  loadAll();
 });
 </script>
 
@@ -63,32 +231,38 @@ const rowSelection = ref({
     <!-- Toolbar -->
     <div style="margin-bottom: 16px">
       <Space>
-        <Button type="primary">
+        <Button type="primary" :loading="syncLoading" @click="handleSync">
           <template #icon><SyncOutlined /></template>
           同步活动
         </Button>
-        <Button type="primary" ghost>
+        <Button type="primary" ghost disabled>
           <template #icon><PlusOutlined /></template>
           参加活动
         </Button>
-        <Button>
+        <Button @click="handleEditActivity">
           <template #icon><EditOutlined /></template>
           编辑活动
         </Button>
-        <Button danger>
-          <template #icon><LogoutOutlined /></template>
-          退出活动
-        </Button>
-        <Button>
+        <Popconfirm
+          title="确定退出所选商品的促销活动？"
+          @confirm="handleExitActivity"
+          okText="确定"
+          cancelText="取消"
+        >
+          <Button danger>
+            <template #icon><LogoutOutlined /></template>
+            退出活动
+          </Button>
+        </Popconfirm>
+        <Button disabled>
           <template #icon><SettingOutlined /></template>
           设置自动退出/参加活动
         </Button>
-        <Button>文档教程</Button>
       </Space>
     </div>
 
     <!-- Status Tabs -->
-    <Tabs v-model:activeKey="activeTab" style="margin-bottom: 16px">
+    <Tabs v-model:activeKey="activeTab" @change="handleTabChange" style="margin-bottom: 16px">
       <TabPane v-for="tab in statusTabs" :key="tab.key">
         <template #tab>
           {{ tab.label }}
@@ -96,32 +270,22 @@ const rowSelection = ref({
             :count="tab.count"
             :number-style="{ backgroundColor: tab.key === activeTab ? '#1890ff' : '#999' }"
             :offset="[6, -4]"
-            :showZero="false"
+            :showZero="true"
           />
         </template>
       </TabPane>
     </Tabs>
 
     <!-- Filters -->
-    <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap">
-      <Select placeholder="平台店铺" style="width: 160px" allowClear />
-      <Select
-        placeholder="状态"
-        style="width: 100px"
-        defaultValue="在售"
+    <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+      <Input
+        v-model:value="keyword"
+        placeholder="搜索标题 / SKU"
+        style="width: 220px"
         allowClear
-      >
-        <SelectOption value="在售">在售</SelectOption>
-      </Select>
-      <Select placeholder="参加方式" style="width: 120px" allowClear>
-        <SelectOption value="MANUAL">手动</SelectOption>
-        <SelectOption value="AUTO">自动</SelectOption>
-      </Select>
-      <Select placeholder="价格筛选" style="width: 120px" allowClear />
-      <DatePicker placeholder="活动结束时间" style="width: 180px" />
-      <Input placeholder="SKU" style="width: 140px" allowClear />
-      <Select placeholder="ProductId" style="width: 140px" allowClear />
-      <Button type="primary">
+        @pressEnter="handleSearch"
+      />
+      <Button type="primary" @click="handleSearch">
         <template #icon><SearchOutlined /></template>
         搜索
       </Button>
@@ -137,7 +301,120 @@ const rowSelection = ref({
       rowKey="id"
       size="small"
       bordered
-      :pagination="{ pageSize: 50, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 行` }"
+      :pagination="{
+        current: currentPage,
+        pageSize: pageSize,
+        total: total,
+        showSizeChanger: true,
+        showTotal: (t: number) => `共 ${t} 行`,
+        pageSizeOptions: ['20', '50', '100'],
+      }"
+      @change="handleTableChange"
+    >
+      <template #bodyCell="{ column, record }">
+        <!-- Image -->
+        <template v-if="column.key === 'image'">
+          <Image
+            v-if="record.product?.primaryImage"
+            :src="record.product.primaryImage"
+            :width="50"
+            :height="50"
+            style="object-fit: cover; border-radius: 4px"
+            :preview="{ visible: false }"
+            fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNmNWY1ZjUiLz48dGV4dCB4PSIyNSIgeT0iMjUiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNjY2MiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWc8L3RleHQ+PC9zdmc+"
+          />
+          <div v-else style="width: 50px; height: 50px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: #ccc; font-size: 10px">
+            No Img
+          </div>
+        </template>
+
+        <!-- Info -->
+        <template v-if="column.key === 'info'">
+          <div style="line-height: 1.5">
+            <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px" :title="record.product?.name">
+              {{ record.product?.name || '-' }}
+            </div>
+            <div style="color: #888; font-size: 12px">
+              SKU: {{ record.product?.skus?.[0]?.ozonSku || '-' }}
+            </div>
+            <div style="color: #888; font-size: 12px">
+              ProductID: {{ record.product?.ozonProductId || '-' }}
+            </div>
+            <div style="color: #888; font-size: 12px">
+              {{ record.product?.storeAccount?.storeName || '-' }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Status -->
+        <template v-if="column.key === 'status'">
+          <Tag v-if="record.participationStatus === 'JOINED'" color="green">已参加</Tag>
+          <Tag v-else-if="record.participationStatus === 'NOT_JOINED'" color="orange">未参加</Tag>
+          <Tag v-else-if="record.participationStatus === 'EXITED'" color="red">已退出</Tag>
+          <Tag v-else>{{ record.participationStatus }}</Tag>
+        </template>
+
+        <!-- Original Price -->
+        <template v-if="column.key === 'originalPrice'">
+          {{ formatPrice(record.originalPrice) }}
+        </template>
+
+        <!-- Lowest Promo Price -->
+        <template v-if="column.key === 'lowestPrice'">
+          <span style="color: #faad14">{{ formatPrice(record.lowestPromoPrice) }}</span>
+        </template>
+
+        <!-- Promo Price -->
+        <template v-if="column.key === 'promoPrice'">
+          <span style="color: #f5222d; font-weight: 500">{{ formatPrice(record.promoPrice) }}</span>
+        </template>
+
+        <!-- Stock -->
+        <template v-if="column.key === 'stock'">
+          <span>{{ record.product?.totalStock ?? '-' }}</span>
+          <span style="color: #888"> / </span>
+          <span style="color: #1890ff">{{ record.promoStock ?? '-' }}</span>
+        </template>
+
+        <!-- Participation -->
+        <template v-if="column.key === 'participation'">
+          <Tag v-if="record.promotion?.participationType === 'AUTO'" color="blue">自动</Tag>
+          <Tag v-else>手动</Tag>
+        </template>
+
+        <!-- Activity Time -->
+        <template v-if="column.key === 'activityTime'">
+          <div style="font-size: 12px">
+            <div>{{ formatDate(record.promotion?.startDate) }}</div>
+            <div>{{ formatDate(record.promotion?.endDate) }}</div>
+          </div>
+        </template>
+
+        <!-- Activity Name -->
+        <template v-if="column.key === 'activityName'">
+          <span :title="record.promotion?.title">{{ record.promotion?.title || '-' }}</span>
+        </template>
+
+        <!-- Action -->
+        <template v-if="column.key === 'action'">
+          <Space :size="4">
+            <Button
+              type="link"
+              size="small"
+              @click="() => { editPromotionId = record.promotionId; editModalVisible = true; }"
+            >
+              编辑
+            </Button>
+          </Space>
+        </template>
+      </template>
+    </Table>
+
+    <!-- Edit Activity Modal -->
+    <EditActivityModal
+      v-model:visible="editModalVisible"
+      :promotionId="editPromotionId"
+      @save="handleEditModalSave"
     />
   </div>
 </template>

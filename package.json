@@ -1,0 +1,21 @@
+{
+  "name": "ozon-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ozon Seller ERP System",
+  "scripts": {
+    "dev:web": "pnpm --filter @ozon-erp/web dev",
+    "dev:server": "pnpm --filter @ozon-erp/server start:dev",
+    "build:web": "pnpm --filter @ozon-erp/web build",
+    "build:server": "pnpm --filter @ozon-erp/server build",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

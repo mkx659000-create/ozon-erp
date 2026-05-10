@@ -1,0 +1,16 @@
+node_modules
+dist
+.turbo
+*.log
+.env.local
+.env.production.local
+.DS_Store
+
+# Prisma
+apps/server/src/prisma/migrations/*_migration.sql
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo

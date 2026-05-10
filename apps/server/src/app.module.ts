@@ -8,6 +8,8 @@ import { UserModule } from './modules/user/user.module';
 import { StoreAccountModule } from './modules/store-account/store-account.module';
 import { ProductModule } from './modules/product/product.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
+import { CategoryModule } from './modules/category/category.module';
+import { ProductPublishModule } from './modules/product-publish/product-publish.module';
 import { JobsModule } from './jobs/jobs.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -22,6 +24,8 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     StoreAccountModule,
     ProductModule,
     PromotionModule,
+    CategoryModule,
+    ProductPublishModule,
     JobsModule,
   ],
   providers: [

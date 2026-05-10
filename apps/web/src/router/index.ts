@@ -41,6 +41,20 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/promotion/index.vue'),
         meta: { title: 'OZON促销活动' },
       },
+      // Order routes
+      {
+        path: 'order/list',
+        name: 'OrderList',
+        component: () => import('@/views/order/index.vue'),
+        meta: { title: '订单管理' },
+      },
+      // Analytics
+      {
+        path: 'analytics',
+        name: 'Analytics',
+        component: () => import('@/views/analytics/index.vue'),
+        meta: { title: '数据分析' },
+      },
       // Store management
       {
         path: 'store-accounts',

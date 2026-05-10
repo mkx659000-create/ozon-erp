@@ -21,6 +21,8 @@ import {
   ShoppingOutlined,
   FireOutlined,
   ShopOutlined,
+  FileTextOutlined,
+  BarChartOutlined,
   UserOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -98,6 +100,14 @@ function handleLogout() {
           </template>
           <MenuItem key="PromotionActivities">OZON促销活动</MenuItem>
         </SubMenu>
+        <MenuItem key="OrderList">
+          <FileTextOutlined />
+          <span>订单管理</span>
+        </MenuItem>
+        <MenuItem key="Analytics">
+          <BarChartOutlined />
+          <span>数据分析</span>
+        </MenuItem>
         <MenuItem key="StoreAccounts">
           <ShopOutlined />
           <span>店铺管理</span>

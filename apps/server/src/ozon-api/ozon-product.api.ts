@@ -83,7 +83,7 @@ export class OzonProductApi {
         body,
       );
 
-      allInfos.push(...data.result.items);
+      allInfos.push(...data.items);
       this.logger.debug(
         `Fetched info for ${allInfos.length}/${productIds.length} products`,
       );
@@ -140,20 +140,21 @@ export class OzonProductApi {
 
   /**
    * Get stock info with cursor pagination.
+   * Real API: items/total/cursor at top level, uses cursor (not last_id).
    */
   async getStockInfo(
     credentials: OzonCredentials,
-  ): Promise<OzonStockInfoResponse['result']['items']> {
+  ): Promise<OzonStockInfoResponse['items']> {
     const client = this.ozonApiService.createClient(credentials);
-    const allItems: OzonStockInfoResponse['result']['items'] = [];
-    let lastId = '';
+    const allItems: OzonStockInfoResponse['items'] = [];
+    let cursor = '';
     const limit = 1000;
 
     while (true) {
       const body: OzonStockInfoRequest = {
         filter: {},
         limit,
-        ...(lastId ? { last_id: lastId } : {}),
+        ...(cursor ? { cursor } : {}),
       };
 
       const { data } = await client.post<OzonStockInfoResponse>(
@@ -161,13 +162,14 @@ export class OzonProductApi {
         body,
       );
 
-      allItems.push(...data.result.items);
-      lastId = data.result.last_id;
+      allItems.push(...data.items);
+      cursor = data.cursor || '';
 
-      if (
-        data.result.items.length < limit ||
-        allItems.length >= data.result.total
-      ) {
+      this.logger.debug(
+        `Fetched ${allItems.length}/${data.total} stock entries`,
+      );
+
+      if (data.items.length < limit || allItems.length >= data.total) {
         break;
       }
     }

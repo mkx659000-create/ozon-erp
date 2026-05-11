@@ -206,11 +206,23 @@ export class ProductService {
     return { synced, failed };
   }
 
-  private async upsertProduct(storeAccountId: string, info: OzonProductInfo) {
-    const status = this.mapOzonStatus(info.status?.state, info.visible);
-    const totalStock = info.stocks
-      ? info.stocks.present + info.stocks.reserved
-      : 0;
+  private async upsertProduct(storeAccountId: string, info: any) {
+    // Real API: statuses.status (not status.state), primary_image is array
+    const ozonStatus = info.statuses?.status || info.status?.state || '';
+    const isArchived = info.is_archived || false;
+    const status = this.mapOzonStatus(ozonStatus, isArchived);
+
+    // primary_image can be string or array
+    const primaryImg = Array.isArray(info.primary_image)
+      ? info.primary_image[0]
+      : info.primary_image || info.images?.[0] || null;
+
+    // stocks: { has_stock, stocks: [{present, reserved, sku, source}] }
+    const stockItems: any[] = info.stocks?.stocks || [];
+    const totalStock = stockItems.reduce((s: number, st: any) => s + (st.present || 0), 0);
+
+    // SKU from sources or top-level sku
+    const primarySku = info.sku || info.sources?.[0]?.sku || 0;
 
     await this.prisma.product.upsert({
       where: {
@@ -223,61 +235,52 @@ export class ProductService {
         storeAccountId,
         ozonProductId: BigInt(info.id),
         offerId: info.offer_id,
-        name: info.name,
-        barcode: info.barcode,
-        categoryId: info.category_id,
-        primaryImage: info.primary_image || info.images?.[0],
+        name: info.name || '',
+        barcode: info.barcodes?.[0] || null,
+        primaryImage: primaryImg,
         images: info.images || [],
         status,
-        visible: info.visible,
+        visible: !isArchived,
         sellingPrice: info.price ? parseFloat(info.price) : null,
         originalPrice: info.old_price ? parseFloat(info.old_price) : null,
         lowestPrice: info.min_price ? parseFloat(info.min_price) : null,
         currencyCode: info.currency_code || 'RUB',
-        priceIndex: info.price_index,
         totalStock,
-        rating: info.rating || null,
         ozonCreatedAt: info.created_at ? new Date(info.created_at) : null,
         ozonUpdatedAt: info.updated_at ? new Date(info.updated_at) : null,
         lastSyncAt: new Date(),
-        skus: {
-          create: [
-            {
-              ozonSku: BigInt(info.sku || info.fbs_sku || 0),
-              fboSku: info.fbo_sku ? BigInt(info.fbo_sku) : null,
-              fbsSku: info.fbs_sku ? BigInt(info.fbs_sku) : null,
-              stock: info.stocks?.present || 0,
-              reserved: info.stocks?.reserved || 0,
-            },
-          ],
-        },
+        skus: primarySku ? {
+          create: [{
+            ozonSku: BigInt(primarySku),
+            stock: stockItems.find((s: any) => s.sku === primarySku)?.present || 0,
+            reserved: stockItems.find((s: any) => s.sku === primarySku)?.reserved || 0,
+          }],
+        } : undefined,
       },
       update: {
-        name: info.name,
-        barcode: info.barcode,
-        categoryId: info.category_id,
-        primaryImage: info.primary_image || info.images?.[0],
+        name: info.name || '',
+        barcode: info.barcodes?.[0] || null,
+        primaryImage: primaryImg,
         images: info.images || [],
         status,
-        visible: info.visible,
+        visible: !isArchived,
         sellingPrice: info.price ? parseFloat(info.price) : null,
         originalPrice: info.old_price ? parseFloat(info.old_price) : null,
         lowestPrice: info.min_price ? parseFloat(info.min_price) : null,
         currencyCode: info.currency_code || 'RUB',
-        priceIndex: info.price_index,
         totalStock,
-        rating: info.rating || null,
         ozonUpdatedAt: info.updated_at ? new Date(info.updated_at) : null,
         lastSyncAt: new Date(),
       },
     });
   }
 
-  private mapOzonStatus(state: string | undefined, visible: boolean): ProductStatus {
-    if (!state) return ProductStatus.MODERATION;
-    switch (state) {
+  private mapOzonStatus(ozonStatus: string, isArchived: boolean): ProductStatus {
+    if (isArchived) return ProductStatus.ARCHIVED;
+    switch (ozonStatus) {
+      case 'price_sent':
       case 'processed':
-        return visible ? ProductStatus.ON_SALE : ProductStatus.REMOVED;
+        return ProductStatus.ON_SALE;
       case 'moderating':
         return ProductStatus.MODERATION;
       case 'failed_moderation':
@@ -289,7 +292,7 @@ export class ProductService {
       case 'archived':
         return ProductStatus.ARCHIVED;
       default:
-        return ProductStatus.MODERATION;
+        return ProductStatus.ON_SALE;
     }
   }
 }

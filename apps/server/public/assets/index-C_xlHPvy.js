@@ -1,0 +1,1 @@
+import{r as e}from"./request-CBW9fwIX.js";function n(){return e.get("/store-accounts")}function c(t){return e.post("/store-accounts",t)}function r(t){return e.delete(`/store-accounts/${t}`)}function s(t){return e.post(`/store-accounts/${t}/test-connection`)}export{c,r as d,n as g,s as t};

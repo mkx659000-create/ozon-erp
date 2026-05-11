@@ -6,6 +6,7 @@ import { PromotionSyncProcessor, PROMOTION_SYNC_QUEUE } from './processors/promo
 import { StockSyncProcessor, STOCK_SYNC_QUEUE } from './processors/stock-sync.processor';
 import { SyncSchedulerService } from './schedulers/sync-scheduler.service';
 import { SyncController } from './sync.controller';
+import { ProductModule } from '../modules/product/product.module';
 
 @Module({
   imports: [
@@ -34,6 +35,9 @@ import { SyncController } from './sync.controller';
       { name: PROMOTION_SYNC_QUEUE },
       { name: STOCK_SYNC_QUEUE },
     ),
+
+    // Import ProductModule so ProductSyncProcessor can use ProductService
+    ProductModule,
   ],
   controllers: [SyncController],
   providers: [

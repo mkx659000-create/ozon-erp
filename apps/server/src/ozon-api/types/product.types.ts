@@ -92,9 +92,7 @@ export interface OzonProductInfo {
 }
 
 export interface OzonProductInfoListResponse {
-  result: {
-    items: OzonProductInfo[];
-  };
+  items: OzonProductInfo[];
 }
 
 // ===== /v1/product/import/prices =====
@@ -143,28 +141,30 @@ export interface OzonStockUpdateResponse {
 }
 
 // ===== /v4/product/info/stocks =====
+// Real API returns items/total/cursor at top level (not nested in result)
 export interface OzonStockInfoRequest {
   filter?: {
     offer_id?: string[];
     product_id?: number[];
     visibility?: string;
   };
-  last_id?: string;
+  cursor?: string;
   limit?: number;
 }
 
 export interface OzonStockInfoResponse {
-  result: {
-    items: Array<{
-      product_id: number;
-      offer_id: string;
-      stocks: Array<{
-        present: number;
-        reserved: number;
-        type: string;
-      }>;
+  items: Array<{
+    product_id: number;
+    offer_id: string;
+    stocks: Array<{
+      present: number;
+      reserved: number;
+      type: string;
+      sku: number;
+      shipment_type: string;
+      warehouse_ids: number[];
     }>;
-    last_id: string;
-    total: number;
-  };
+  }>;
+  cursor: string;
+  total: number;
 }

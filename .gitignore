@@ -14,3 +14,4 @@ apps/server/src/prisma/migrations/*_migration.sql
 .idea
 *.swp
 *.swo
+apps/server/.env

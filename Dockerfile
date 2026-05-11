@@ -15,11 +15,10 @@ RUN npx nest build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install production deps and rebuild native modules
+# Install production deps (copy bcrypt native binding from builder to avoid Python requirement)
 COPY apps/server/package.json ./
-RUN npm install --omit=dev && \
-    npm install bcrypt && \
-    npm rebuild bcrypt --build-from-source
+RUN npm install --omit=dev
+COPY --from=builder /app/node_modules/bcrypt ./node_modules/bcrypt
 
 # Copy built files
 COPY --from=builder /app/dist ./dist

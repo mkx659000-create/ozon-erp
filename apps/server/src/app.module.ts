@@ -11,6 +11,8 @@ import { PromotionModule } from './modules/promotion/promotion.module';
 import { OrderModule } from './modules/order/order.module';
 import { CategoryModule } from './modules/category/category.module';
 import { ProductPublishModule } from './modules/product-publish/product-publish.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { OperationLogModule } from './modules/operation-log/operation-log.module';
 import { JobsModule } from './jobs/jobs.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -28,6 +30,8 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     OrderModule,
     CategoryModule,
     ProductPublishModule,
+    DashboardModule,
+    OperationLogModule,
     JobsModule,
   ],
   providers: [

@@ -6,7 +6,6 @@ import {
   Button,
   Space,
   Input,
-  DatePicker,
   Tabs,
   TabPane,
   Badge,
@@ -14,13 +13,14 @@ import {
   Descriptions,
   DescriptionsItem,
   message,
-  Timeline,
-  TimelineItem,
+  Spin,
+  Empty,
 } from 'ant-design-vue';
 import {
   SyncOutlined,
   SearchOutlined,
   EyeOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons-vue';
 import { useStoreAccountStore } from '@/store';
 import {
@@ -158,6 +158,13 @@ function handleSearch() {
   fetchData();
 }
 
+function handleReset() {
+  keyword.value = '';
+  activeTab.value = 'ALL';
+  currentPage.value = 1;
+  loadAll();
+}
+
 function handleTableChange(pagination: any) {
   currentPage.value = pagination.current;
   pageSize.value = pagination.pageSize;
@@ -183,27 +190,35 @@ watch(storeAccountId, () => {
 
 <template>
   <div>
-    <h2 style="margin-bottom: 16px">订单管理</h2>
-
-    <!-- Toolbar -->
-    <div style="margin-bottom: 16px">
-      <Space>
-        <Button type="primary" :loading="syncLoading" @click="handleSync">
-          <template #icon><SyncOutlined /></template>
-          同步订单
-        </Button>
-      </Space>
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">订单管理</h2>
+        <p class="page-desc">管理 Ozon 平台订单，支持同步和查看详情</p>
+      </div>
+      <Button type="primary" :loading="syncLoading" @click="handleSync">
+        <template #icon><SyncOutlined /></template>
+        同步订单
+      </Button>
     </div>
 
     <!-- Tabs -->
-    <Tabs v-model:activeKey="activeTab" @change="handleTabChange" style="margin-bottom: 16px">
+    <Tabs v-model:activeKey="activeTab" @change="handleTabChange" class="status-tabs">
       <TabPane v-for="tab in tabs" :key="tab.key">
         <template #tab>
           {{ tab.label }}
           <Badge
             :count="tab.count"
-            :numberStyle="{ backgroundColor: tab.key === activeTab ? '#1890ff' : '#999' }"
-            :offset="[6, -4]"
+            :numberStyle="{
+              backgroundColor: tab.key === activeTab ? '#1890ff' : '#f0f0f0',
+              color: tab.key === activeTab ? '#fff' : '#8c8c8c',
+              fontSize: '11px',
+              height: '18px',
+              lineHeight: '18px',
+              padding: '0 6px',
+              minWidth: '18px',
+            }"
+            :offset="[6, -2]"
             :showZero="true"
           />
         </template>
@@ -211,17 +226,20 @@ watch(storeAccountId, () => {
     </Tabs>
 
     <!-- Search -->
-    <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center">
+    <div class="search-bar">
       <Input
         v-model:value="keyword"
         placeholder="搜索订单号 / 物流单号"
-        style="width: 250px"
+        style="width: 280px"
         allowClear
         @pressEnter="handleSearch"
-      />
-      <Button type="primary" @click="handleSearch">
-        <template #icon><SearchOutlined /></template>
-        搜索
+      >
+        <template #prefix><SearchOutlined style="color: #bfbfbf" /></template>
+      </Input>
+      <Button type="primary" @click="handleSearch">搜索</Button>
+      <Button @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
       </Button>
     </div>
 
@@ -246,47 +264,49 @@ watch(storeAccountId, () => {
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'postingNumber'">
-          <div>
-            <a style="font-weight: 500" @click="viewOrder(record.id)">
-              {{ record.ozonPostingNumber }}
-            </a>
-          </div>
+          <a class="order-link" @click="viewOrder(record.id)">
+            {{ record.ozonPostingNumber }}
+          </a>
         </template>
 
         <template v-if="column.key === 'status'">
-          <Tag :color="statusConfig[record.orderStatus]?.color || 'default'">
+          <Tag :color="statusConfig[record.orderStatus]?.color || 'default'" style="margin: 0">
             {{ statusConfig[record.orderStatus]?.label || record.orderStatus }}
           </Tag>
         </template>
 
         <template v-if="column.key === 'items'">
-          <div v-if="record.items?.length" style="font-size: 12px">
-            <div v-for="(item, idx) in record.items.slice(0, 3)" :key="idx">
-              {{ item.name?.substring(0, 40) }}{{ item.name?.length > 40 ? '...' : '' }}
-              <span style="color: #888"> x{{ item.quantity }}</span>
+          <div v-if="record.items?.length" style="font-size: 12px; line-height: 1.6">
+            <div v-for="(item, idx) in record.items.slice(0, 3)" :key="idx" class="order-item">
+              <span class="order-item-name">{{ item.name?.substring(0, 40) }}{{ item.name?.length > 40 ? '...' : '' }}</span>
+              <span class="order-item-qty">×{{ item.quantity }}</span>
             </div>
-            <div v-if="record.items.length > 3" style="color: #888">
+            <div v-if="record.items.length > 3" style="color: #8c8c8c">
               ... 共 {{ record.items.length }} 件商品
             </div>
           </div>
-          <span v-else style="color: #ccc">-</span>
+          <span v-else style="color: #d9d9d9">-</span>
         </template>
 
         <template v-if="column.key === 'amount'">
-          <span style="font-weight: 500">{{ formatPrice(record.totalAmount) }}</span>
+          <span style="font-weight: 600; color: #1a1a1a">{{ formatPrice(record.totalAmount) }}</span>
         </template>
 
         <template v-if="column.key === 'store'">
-          {{ record.storeAccount?.storeName || '-' }}
+          <Tag v-if="record.storeAccount?.storeName" color="blue" style="margin: 0">
+            {{ record.storeAccount.storeName }}
+          </Tag>
+          <span v-else style="color: #d9d9d9">-</span>
         </template>
 
         <template v-if="column.key === 'createdAt'">
-          {{ formatDate(record.ozonCreatedAt) }}
+          <span style="font-size: 13px; color: #595959">{{ formatDate(record.ozonCreatedAt) }}</span>
         </template>
 
         <template v-if="column.key === 'action'">
           <Button type="link" size="small" @click="viewOrder(record.id)">
             <template #icon><EyeOutlined /></template>
+            详情
           </Button>
         </template>
       </template>
@@ -297,51 +317,114 @@ watch(storeAccountId, () => {
       v-model:open="drawerVisible"
       title="订单详情"
       width="600"
-      :loading="drawerLoading"
+      :destroyOnClose="true"
     >
-      <template v-if="drawerOrder">
-        <Descriptions bordered size="small" :column="2">
-          <DescriptionsItem label="订单号" :span="2">
-            {{ drawerOrder.ozonPostingNumber }}
-          </DescriptionsItem>
-          <DescriptionsItem label="状态">
-            <Tag :color="statusConfig[drawerOrder.orderStatus]?.color">
-              {{ statusConfig[drawerOrder.orderStatus]?.label || drawerOrder.orderStatus }}
-            </Tag>
-          </DescriptionsItem>
-          <DescriptionsItem label="金额">
-            {{ formatPrice(drawerOrder.totalAmount) }}
-          </DescriptionsItem>
-          <DescriptionsItem label="物流单号">
-            {{ drawerOrder.trackingNumber || '-' }}
-          </DescriptionsItem>
-          <DescriptionsItem label="店铺">
-            {{ drawerOrder.storeAccount?.storeName || '-' }}
-          </DescriptionsItem>
-          <DescriptionsItem label="创建时间" :span="2">
-            {{ formatDate(drawerOrder.ozonCreatedAt) }}
-          </DescriptionsItem>
-        </Descriptions>
+      <Spin :spinning="drawerLoading">
+        <template v-if="drawerOrder">
+          <Descriptions bordered size="small" :column="2">
+            <DescriptionsItem label="订单号" :span="2">
+              <span style="font-weight: 500">{{ drawerOrder.ozonPostingNumber }}</span>
+            </DescriptionsItem>
+            <DescriptionsItem label="状态">
+              <Tag :color="statusConfig[drawerOrder.orderStatus]?.color" style="margin: 0">
+                {{ statusConfig[drawerOrder.orderStatus]?.label || drawerOrder.orderStatus }}
+              </Tag>
+            </DescriptionsItem>
+            <DescriptionsItem label="金额">
+              <span style="font-weight: 600; font-size: 16px">{{ formatPrice(drawerOrder.totalAmount) }}</span>
+            </DescriptionsItem>
+            <DescriptionsItem label="物流单号">
+              {{ drawerOrder.trackingNumber || '-' }}
+            </DescriptionsItem>
+            <DescriptionsItem label="店铺">
+              {{ drawerOrder.storeAccount?.storeName || '-' }}
+            </DescriptionsItem>
+            <DescriptionsItem label="创建时间" :span="2">
+              {{ formatDate(drawerOrder.ozonCreatedAt) }}
+            </DescriptionsItem>
+          </Descriptions>
 
-        <h4 style="margin: 24px 0 12px">商品明细</h4>
-        <Table
-          :dataSource="drawerOrder.items"
-          :columns="[
-            { title: '商品名', dataIndex: 'name', key: 'name' },
-            { title: '数量', dataIndex: 'quantity', key: 'qty', width: 70 },
-            { title: '单价', key: 'price', width: 100 },
-          ]"
-          size="small"
-          :pagination="false"
-          rowKey="id"
-        >
-          <template #bodyCell="{ column, record: item }">
-            <template v-if="column.key === 'price'">
-              {{ formatPrice(item.price) }}
+          <h4 style="margin: 24px 0 12px; font-weight: 600">商品明细</h4>
+          <Table
+            :dataSource="drawerOrder.items"
+            :columns="[
+              { title: '商品名', dataIndex: 'name', key: 'name' },
+              { title: '数量', dataIndex: 'quantity', key: 'qty', width: 70, align: 'center' as any },
+              { title: '单价', key: 'price', width: 100, align: 'right' as any },
+            ]"
+            size="small"
+            :pagination="false"
+            rowKey="id"
+            bordered
+          >
+            <template #bodyCell="{ column, record: item }">
+              <template v-if="column.key === 'price'">
+                {{ formatPrice(item.price) }}
+              </template>
             </template>
-          </template>
-        </Table>
-      </template>
+          </Table>
+        </template>
+        <Empty v-else-if="!drawerLoading" description="暂无数据" />
+      </Spin>
     </Drawer>
   </div>
 </template>
+
+<style scoped>
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.page-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.page-desc {
+  margin: 0;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.status-tabs {
+  margin-bottom: 12px;
+}
+.status-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: 0;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.order-link {
+  font-weight: 500;
+  color: #1890ff;
+  cursor: pointer;
+}
+.order-link:hover {
+  text-decoration: underline;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.order-item-name {
+  color: #595959;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.order-item-qty {
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+</style>

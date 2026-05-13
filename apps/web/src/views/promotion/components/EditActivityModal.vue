@@ -11,6 +11,7 @@ import {
   Tooltip,
   Popconfirm,
   Tag,
+  Divider,
 } from 'ant-design-vue';
 import {
   CopyOutlined,
@@ -42,7 +43,7 @@ const pageSize = ref(100);
 const selectedRowKeys = ref<string[]>([]);
 
 interface EditRow {
-  id: string; // promotionProduct id
+  id: string;
   productId: string;
   productName: string;
   offerId: string;
@@ -62,14 +63,14 @@ interface EditRow {
 /* ---- columns ---- */
 const columns = [
   { title: '主图', key: 'image', width: 70 },
-  { title: '标题 / SKU / ProductID / 店铺', key: 'info', width: 260 },
+  { title: '标题 / SKU / ID / 店铺', key: 'info', width: 260 },
   { title: '活动', key: 'activity', width: 140 },
   { title: '原价', key: 'originalPrice', width: 100, align: 'right' as const },
-  { title: '最低促销价格', key: 'lowestPrice', width: 120, align: 'right' as const },
+  { title: '最低促销价', key: 'lowestPrice', width: 110, align: 'right' as const },
   { title: '促销价格', key: 'promoPrice', width: 130 },
   { title: '促销折扣', key: 'promoDiscount', width: 130 },
   { title: '促销库存', key: 'promoStock', width: 130 },
-  { title: '操作', key: 'action', width: 120 },
+  { title: '操作', key: 'action', width: 110 },
 ];
 
 /* ---- data fetching ---- */
@@ -114,7 +115,7 @@ const rowSelection = computed(() => ({
   },
 }));
 
-/* ---- "同首行" logic: apply first row's values to all rows ---- */
+/* ---- "同首行" logic ---- */
 function applyFirstRowDiscount() {
   const first = visibleRows.value[0];
   if (!first) return;
@@ -150,7 +151,6 @@ function applyFirstRowPrice() {
 
 /* ---- per-row actions ---- */
 function applySameDiscount(row: EditRow) {
-  // Apply this row's discount to all rows in the same promotion
   for (const r of visibleRows.value) {
     if (r.id !== row.id) {
       r.promoDiscount = row.promoDiscount;
@@ -226,29 +226,39 @@ watch(
     :maskClosable="false"
     :destroyOnClose="true"
     @cancel="handleCancel"
+    class="edit-modal"
   >
     <template #footer>
-      <div style="display: flex; justify-content: space-between; align-items: center">
-        <div>
-          <Space>
-            <Button size="small" @click="applyFirstRowPrice">
-              <template #icon><CopyOutlined /></template>
-              促销价格同首行
-            </Button>
-            <Button size="small" @click="applyFirstRowDiscount">
-              <template #icon><CopyOutlined /></template>
-              折扣同首行
-            </Button>
-            <Button size="small" @click="applyFirstRowStock">
-              <template #icon><CopyOutlined /></template>
-              库存同首行
-            </Button>
+      <div class="modal-footer">
+        <div class="footer-left">
+          <Space :size="6">
+            <Tooltip title="将第一行的促销价格应用到所有行">
+              <Button size="small" @click="applyFirstRowPrice">
+                <template #icon><CopyOutlined /></template>
+                价格同首行
+              </Button>
+            </Tooltip>
+            <Tooltip title="将第一行的折扣应用到所有行">
+              <Button size="small" @click="applyFirstRowDiscount">
+                <template #icon><CopyOutlined /></template>
+                折扣同首行
+              </Button>
+            </Tooltip>
+            <Tooltip title="将第一行的库存应用到所有行">
+              <Button size="small" @click="applyFirstRowStock">
+                <template #icon><CopyOutlined /></template>
+                库存同首行
+              </Button>
+            </Tooltip>
           </Space>
         </div>
         <div>
           <Space>
+            <span v-if="visibleRows.length > 0" style="color: #8c8c8c; font-size: 12px; margin-right: 8px">
+              共 {{ visibleRows.length }} 个商品
+            </span>
             <Button @click="handleCancel">取消</Button>
-            <Button type="primary" :loading="saving" @click="handleSave">确定</Button>
+            <Button type="primary" :loading="saving" @click="handleSave">确定保存</Button>
           </Space>
         </div>
       </div>
@@ -281,40 +291,42 @@ watch(
             :src="record.primaryImage"
             :width="45"
             :height="45"
-            style="object-fit: cover; border-radius: 4px"
+            style="object-fit: cover; border-radius: 6px"
             :preview="{ visible: false }"
             fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDUiIGhlaWdodD0iNDUiIHZpZXdCb3g9IjAgMCA0NSA0NSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDUiIGhlaWdodD0iNDUiIGZpbGw9IiNmNWY1ZjUiLz48L3N2Zz4="
           />
-          <div v-else style="width: 45px; height: 45px; background: #f5f5f5; border-radius: 4px" />
+          <div v-else class="img-placeholder" />
         </template>
 
         <!-- Info -->
         <template v-if="column.key === 'info'">
           <div style="line-height: 1.4">
-            <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px" :title="record.productName">
+            <div class="product-name" :title="record.productName">
               {{ record.productName || '-' }}
             </div>
-            <div style="color: #888; font-size: 11px">SKU: {{ record.skuText || '-' }}</div>
-            <div style="color: #888; font-size: 11px">ID: {{ record.ozonProductId || '-' }}</div>
-            <div style="color: #888; font-size: 11px">{{ record.storeName }}</div>
+            <div class="product-meta">SKU: {{ record.skuText || '-' }}</div>
+            <div class="product-meta">ID: {{ record.ozonProductId || '-' }}</div>
+            <div class="product-meta">{{ record.storeName }}</div>
           </div>
         </template>
 
         <!-- Activity -->
         <template v-if="column.key === 'activity'">
-          <Tag color="blue" style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
-            {{ record.promotionTitle || '-' }}
-          </Tag>
+          <Tooltip :title="record.promotionTitle">
+            <Tag color="blue" class="activity-tag">
+              {{ record.promotionTitle || '-' }}
+            </Tag>
+          </Tooltip>
         </template>
 
         <!-- Original Price -->
         <template v-if="column.key === 'originalPrice'">
-          {{ formatPrice(record.originalPrice) }}
+          <span style="color: #595959">{{ formatPrice(record.originalPrice) }}</span>
         </template>
 
         <!-- Lowest Price -->
         <template v-if="column.key === 'lowestPrice'">
-          <span style="color: #faad14">{{ formatPrice(record.lowestPromoPrice) }}</span>
+          <span style="color: #faad14; font-weight: 500">{{ formatPrice(record.lowestPromoPrice) }}</span>
         </template>
 
         <!-- Editable: Promo Price -->
@@ -358,16 +370,15 @@ watch(
 
         <!-- Actions -->
         <template v-if="column.key === 'action'">
-          <Space :size="2" direction="vertical">
+          <Space :size="0">
             <Tooltip title="同活动使用此折扣">
               <Button type="link" size="small" @click="applySameDiscount(record as EditRow)">
                 同折扣
               </Button>
             </Tooltip>
-            <Popconfirm title="确定移除此商品？" @confirm="removeRow(record as EditRow)" okText="确定" cancelText="取消">
+            <Popconfirm title="确定移除？" @confirm="removeRow(record as EditRow)" okText="确定" cancelText="取消">
               <Button type="link" size="small" danger>
                 <template #icon><DeleteOutlined /></template>
-                移除
               </Button>
             </Popconfirm>
           </Space>
@@ -376,3 +387,43 @@ watch(
     </Table>
   </Modal>
 </template>
+
+<style scoped>
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.product-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 230px;
+  color: #1a1a1a;
+}
+.product-meta {
+  color: #8c8c8c;
+  font-size: 11px;
+}
+
+.img-placeholder {
+  width: 45px;
+  height: 45px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  border: 1px dashed #e8e8e8;
+}
+
+.activity-tag {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

@@ -14,20 +14,21 @@ import {
   Divider,
   Row,
   Col,
-  Upload,
   message,
   Steps,
   Step,
   Result,
   TreeSelect,
   Spin,
+  Alert,
 } from 'ant-design-vue';
 import {
-  PlusOutlined,
   SendOutlined,
-  InboxOutlined,
+  RightOutlined,
+  LeftOutlined,
 } from '@ant-design/icons-vue';
 import { useStoreAccountStore } from '@/store';
+import { useRouter } from 'vue-router';
 import {
   publishProductApi,
   getCategoryAttributesApi,
@@ -36,8 +37,10 @@ import {
 } from '@/api/product-publish';
 import { getFullCategoryTreeApi, type Category } from '@/api/category';
 
+const router = useRouter();
 const storeAccountStore = useStoreAccountStore();
 const storeAccountId = computed(() => storeAccountStore.activeStoreId || '');
+const hasStore = computed(() => storeAccountStore.stores.length > 0);
 
 /* ---- steps ---- */
 const currentStep = ref(0);
@@ -76,7 +79,7 @@ function transformTree(nodes: Category[]): any[] {
     value: n.id,
     title: n.nameZh ? `${n.nameZh} (${n.name})` : n.name,
     children: n.children && n.children.length > 0 ? transformTree(n.children) : undefined,
-    selectable: !n.hasChildren, // only leaf categories are selectable
+    selectable: !n.hasChildren,
   }));
 }
 
@@ -134,6 +137,14 @@ function handlePrevStep() {
 async function handlePublish() {
   if (!storeAccountId.value) {
     message.warning('请先选择店铺');
+    return;
+  }
+  if (!formData.value.name) {
+    message.warning('请填写商品名称');
+    return;
+  }
+  if (!formData.value.offerId) {
+    message.warning('请填写商家SKU');
     return;
   }
 
@@ -194,22 +205,42 @@ loadCategories();
 
 <template>
   <div>
-    <h2 style="margin-bottom: 24px">OZON产品刊登</h2>
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">OZON产品刊登</h2>
+        <p class="page-desc">选择分类，填写商品信息，提交到Ozon平台</p>
+      </div>
+    </div>
 
-    <Card>
-      <Steps :current="currentStep" style="margin-bottom: 32px">
-        <Step title="选择分类" description="选择商品所属的Ozon分类" />
+    <!-- No Store Alert -->
+    <Alert
+      v-if="!hasStore"
+      type="warning"
+      show-icon
+      banner
+      style="margin-bottom: 20px; border-radius: 8px"
+    >
+      <template #message>
+        <span>请先添加店铺后再刊登产品。</span>
+        <Button type="link" size="small" @click="router.push({ name: 'StoreAccounts' })">
+          前往添加 <RightOutlined />
+        </Button>
+      </template>
+    </Alert>
+
+    <Card style="border-radius: 10px">
+      <Steps :current="currentStep" style="margin-bottom: 36px; max-width: 700px; margin-left: auto; margin-right: auto">
+        <Step title="选择分类" description="选择Ozon商品分类" />
         <Step title="填写信息" description="填写商品详细信息" />
         <Step title="提交结果" description="查看提交状态" />
       </Steps>
 
       <!-- Step 1: Category Selection -->
       <div v-if="currentStep === 0">
-        <div style="max-width: 600px; margin: 0 auto">
-          <h3 style="margin-bottom: 16px">选择商品分类</h3>
-          <p style="color: #888; margin-bottom: 16px">
-            请选择商品所属的 Ozon 分类。只能选择最末级分类。
-          </p>
+        <div class="step-content">
+          <h3 class="step-title">选择商品分类</h3>
+          <p class="step-desc">请选择商品所属的 Ozon 分类。只能选择最末级分类。</p>
 
           <Spin :spinning="categoryLoading">
             <TreeSelect
@@ -228,30 +259,27 @@ loadCategories();
           </Spin>
 
           <!-- Show required attributes preview -->
-          <div v-if="categoryAttributes.length > 0" style="margin-top: 24px">
-            <h4>此分类必填属性 ({{ categoryAttributes.filter(a => a.is_required).length }} 项)</h4>
-            <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px">
+          <div v-if="categoryAttributes.length > 0" class="attr-preview">
+            <h4 style="margin: 0 0 8px; font-size: 14px">
+              此分类必填属性
+              <span style="color: #8c8c8c; font-weight: 400">
+                ({{ categoryAttributes.filter(a => a.is_required).length }} 项)
+              </span>
+            </h4>
+            <div class="attr-tags">
               <span
                 v-for="attr in categoryAttributes.filter(a => a.is_required).slice(0, 20)"
                 :key="attr.id"
-                style="
-                  display: inline-block;
-                  padding: 2px 8px;
-                  background: #e6f7ff;
-                  border: 1px solid #91d5ff;
-                  border-radius: 4px;
-                  font-size: 12px;
-                  color: #1890ff;
-                "
+                class="attr-tag"
               >
                 {{ attr.name }}
               </span>
             </div>
           </div>
 
-          <div style="margin-top: 32px; text-align: center">
+          <div style="margin-top: 36px; text-align: center">
             <Button type="primary" size="large" @click="handleNextStep" :disabled="!selectedCategoryId">
-              下一步
+              下一步 <RightOutlined />
             </Button>
           </div>
         </div>
@@ -263,18 +291,18 @@ loadCategories();
           ref="formRef"
           :model="formData"
           layout="vertical"
-          style="max-width: 800px; margin: 0 auto"
+          class="publish-form"
         >
-          <Divider>基本信息</Divider>
+          <Divider orientation="left">基本信息</Divider>
           <Row :gutter="16">
             <Col :span="16">
               <FormItem label="商品名称" required>
-                <Input v-model:value="formData.name" placeholder="输入商品名称（俄语/英语）" />
+                <Input v-model:value="formData.name" placeholder="输入商品名称（俄语/英语）" size="large" />
               </FormItem>
             </Col>
             <Col :span="8">
               <FormItem label="商家SKU (Offer ID)" required>
-                <Input v-model:value="formData.offerId" placeholder="如 MY-SKU-001" />
+                <Input v-model:value="formData.offerId" placeholder="如 MY-SKU-001" size="large" />
               </FormItem>
             </Col>
           </Row>
@@ -284,12 +312,14 @@ loadCategories();
               v-model:value="formData.description"
               :rows="4"
               placeholder="商品详细描述..."
+              showCount
+              :maxlength="5000"
             />
           </FormItem>
 
-          <Divider>价格</Divider>
+          <Divider orientation="left">价格</Divider>
           <Row :gutter="16">
-            <Col :span="8">
+            <Col :xs="24" :sm="8">
               <FormItem label="售价" required>
                 <InputNumber
                   v-model:value="formData.price"
@@ -297,10 +327,11 @@ loadCategories();
                   :precision="2"
                   style="width: 100%"
                   prefix="₽"
+                  size="large"
                 />
               </FormItem>
             </Col>
-            <Col :span="8">
+            <Col :xs="24" :sm="8">
               <FormItem label="原价 (划线价)">
                 <InputNumber
                   v-model:value="formData.oldPrice"
@@ -308,12 +339,13 @@ loadCategories();
                   :precision="2"
                   style="width: 100%"
                   prefix="₽"
+                  size="large"
                 />
               </FormItem>
             </Col>
-            <Col :span="8">
+            <Col :xs="24" :sm="8">
               <FormItem label="货币">
-                <Select v-model:value="formData.currencyCode">
+                <Select v-model:value="formData.currencyCode" size="large">
                   <SelectOption value="RUB">RUB (卢布)</SelectOption>
                   <SelectOption value="USD">USD (美元)</SelectOption>
                   <SelectOption value="EUR">EUR (欧元)</SelectOption>
@@ -323,53 +355,59 @@ loadCategories();
             </Col>
           </Row>
 
-          <Divider>物流信息</Divider>
+          <Divider orientation="left">物流信息</Divider>
           <Row :gutter="16">
-            <Col :span="6">
+            <Col :xs="12" :sm="6">
               <FormItem label="毛重 (克)">
                 <InputNumber
                   v-model:value="formData.weightGross"
                   :min="0"
                   style="width: 100%"
+                  size="large"
                 />
               </FormItem>
             </Col>
-            <Col :span="6">
+            <Col :xs="12" :sm="6">
               <FormItem label="长 (mm)">
                 <InputNumber
                   v-model:value="formData.dimensionLength"
                   :min="0"
                   style="width: 100%"
+                  size="large"
                 />
               </FormItem>
             </Col>
-            <Col :span="6">
+            <Col :xs="12" :sm="6">
               <FormItem label="宽 (mm)">
                 <InputNumber
                   v-model:value="formData.dimensionWidth"
                   :min="0"
                   style="width: 100%"
+                  size="large"
                 />
               </FormItem>
             </Col>
-            <Col :span="6">
+            <Col :xs="12" :sm="6">
               <FormItem label="高 (mm)">
                 <InputNumber
                   v-model:value="formData.dimensionHeight"
                   :min="0"
                   style="width: 100%"
+                  size="large"
                 />
               </FormItem>
             </Col>
           </Row>
 
-          <Divider>图片</Divider>
+          <Divider orientation="left">图片</Divider>
           <FormItem label="主图 URL">
-            <Input v-model:value="formData.primaryImage" placeholder="https://..." />
+            <Input v-model:value="formData.primaryImage" placeholder="https://..." size="large" />
           </FormItem>
 
-          <div style="margin-top: 32px; display: flex; justify-content: space-between">
-            <Button @click="handlePrevStep">上一步</Button>
+          <div class="form-actions">
+            <Button size="large" @click="handlePrevStep">
+              <LeftOutlined /> 上一步
+            </Button>
             <Button type="primary" size="large" :loading="publishing" @click="handlePublish">
               <template #icon><SendOutlined /></template>
               提交刊登
@@ -384,12 +422,12 @@ loadCategories();
           v-if="publishResult && !publishResult.error"
           status="success"
           title="刊登任务已提交"
-          :sub-title="`任务ID: ${publishResult.taskId || '-'}. ${publishResult.message || ''}`"
+          :sub-title="`任务ID: ${publishResult.taskId || '-'}. ${publishResult.message || '商品正在审核中，请稍后查看。'}`"
         >
           <template #extra>
-            <Space>
-              <Button type="primary" @click="handleReset">继续刊登</Button>
-              <Button @click="$router.push({ name: 'ProductOnline' })">返回产品列表</Button>
+            <Space :size="12">
+              <Button type="primary" size="large" @click="handleReset">继续刊登</Button>
+              <Button size="large" @click="router.push({ name: 'ProductOnline' })">返回产品列表</Button>
             </Space>
           </template>
         </Result>
@@ -400,10 +438,83 @@ loadCategories();
           :sub-title="publishResult.error"
         >
           <template #extra>
-            <Button type="primary" @click="handlePrevStep">返回修改</Button>
+            <Button type="primary" size="large" @click="handlePrevStep">
+              <LeftOutlined /> 返回修改
+            </Button>
           </template>
         </Result>
       </div>
     </Card>
   </div>
 </template>
+
+<style scoped>
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.page-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.page-desc {
+  margin: 0;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.step-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+.step-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.step-desc {
+  color: #8c8c8c;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.attr-preview {
+  margin-top: 24px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+.attr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.attr-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1890ff;
+}
+
+.publish-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-actions {
+  margin-top: 36px;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+</style>

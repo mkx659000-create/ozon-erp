@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Query, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, UseGuards, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CategoryService } from './category.service';
 
 @Controller('categories')
 @UseGuards(AuthGuard('jwt'))
 export class CategoryController {
+  private readonly logger = new Logger(CategoryController.name);
+
   constructor(private readonly categoryService: CategoryService) {}
 
   /**
@@ -45,7 +47,12 @@ export class CategoryController {
    * POST /categories/sync — sync category tree from Ozon.
    */
   @Post('sync')
-  sync(@Body('storeAccountId') storeAccountId: string) {
-    return this.categoryService.syncFromOzon(storeAccountId);
+  async sync(@Body('storeAccountId') storeAccountId: string) {
+    try {
+      return await this.categoryService.syncFromOzon(storeAccountId);
+    } catch (error: any) {
+      this.logger.error(`Category sync error: ${error.message}`, error.stack);
+      return { synced: 0, error: error.message || '分类同步失败' };
+    }
   }
 }

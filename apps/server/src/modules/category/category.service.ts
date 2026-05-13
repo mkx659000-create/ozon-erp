@@ -112,7 +112,24 @@ export class CategoryService {
     this.logger.log('Starting category tree sync from Ozon');
 
     // Get tree in default language (Russian names)
-    const treeDefault = await this.ozonCategoryApi.getCategoryTree(credentials, 'DEFAULT');
+    let treeDefault: OzonCategoryTreeNode[];
+    try {
+      treeDefault = await this.ozonCategoryApi.getCategoryTree(credentials, 'DEFAULT');
+    } catch (error: any) {
+      this.logger.error(`Failed to get category tree: ${error.message}`);
+      // Try without language param
+      try {
+        treeDefault = await this.ozonCategoryApi.getCategoryTree(credentials, 'RU');
+      } catch (retryError: any) {
+        this.logger.error(`Category tree retry failed: ${retryError.message}`);
+        throw new Error(`无法获取分类树: ${error.message}`);
+      }
+    }
+
+    if (!treeDefault || treeDefault.length === 0) {
+      this.logger.warn('Empty category tree from Ozon');
+      return { synced: 0, message: '分类树为空' };
+    }
 
     // Get tree in Chinese
     let treeZh: OzonCategoryTreeNode[] = [];
@@ -128,33 +145,39 @@ export class CategoryService {
 
     // Flatten and upsert
     let count = 0;
+    let failed = 0;
     const flatten = async (
       nodes: OzonCategoryTreeNode[],
       parentId: number | null,
       level: number,
     ) => {
       for (const node of nodes) {
-        await this.prisma.category.upsert({
-          where: { id: node.description_category_id },
-          create: {
-            id: node.description_category_id,
-            parentId,
-            name: node.category_name,
-            nameZh: zhNameMap.get(node.description_category_id) || null,
-            level,
-            hasChildren: node.children && node.children.length > 0,
-            lastSyncAt: new Date(),
-          },
-          update: {
-            parentId,
-            name: node.category_name,
-            nameZh: zhNameMap.get(node.description_category_id) || null,
-            level,
-            hasChildren: node.children && node.children.length > 0,
-            lastSyncAt: new Date(),
-          },
-        });
-        count++;
+        try {
+          await this.prisma.category.upsert({
+            where: { id: node.description_category_id },
+            create: {
+              id: node.description_category_id,
+              parentId,
+              name: node.category_name,
+              nameZh: zhNameMap.get(node.description_category_id) || null,
+              level,
+              hasChildren: node.children && node.children.length > 0,
+              lastSyncAt: new Date(),
+            },
+            update: {
+              parentId,
+              name: node.category_name,
+              nameZh: zhNameMap.get(node.description_category_id) || null,
+              level,
+              hasChildren: node.children && node.children.length > 0,
+              lastSyncAt: new Date(),
+            },
+          });
+          count++;
+        } catch (error: any) {
+          this.logger.error(`Failed to upsert category ${node.description_category_id}: ${error.message}`);
+          failed++;
+        }
 
         if (node.children && node.children.length > 0) {
           await flatten(node.children, node.description_category_id, level + 1);
@@ -164,8 +187,8 @@ export class CategoryService {
 
     await flatten(treeDefault, null, 0);
 
-    this.logger.log(`Category sync complete: ${count} categories`);
-    return { synced: count };
+    this.logger.log(`Category sync complete: ${count} synced, ${failed} failed`);
+    return { synced: count, failed };
   }
 
   /**

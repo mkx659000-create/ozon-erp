@@ -143,49 +143,82 @@ export class CategoryService {
     const zhNameMap = new Map<number, string>();
     this.flattenTreeNames(treeZh, zhNameMap);
 
-    // Flatten and upsert
-    let count = 0;
-    let failed = 0;
-    const flatten = async (
+    // Flatten tree into a level-ordered list to avoid foreign key issues.
+    // Also deduplicate — Ozon tree can have same category_id under multiple parents.
+    interface FlatNode {
+      id: number;
+      parentId: number | null;
+      name: string;
+      nameZh: string | null;
+      level: number;
+      hasChildren: boolean;
+    }
+
+    const flatNodes: FlatNode[] = [];
+    const seenIds = new Set<number>();
+
+    const collectNodes = (
       nodes: OzonCategoryTreeNode[],
       parentId: number | null,
       level: number,
     ) => {
       for (const node of nodes) {
-        try {
-          await this.prisma.category.upsert({
-            where: { id: node.description_category_id },
-            create: {
-              id: node.description_category_id,
-              parentId,
-              name: node.category_name,
-              nameZh: zhNameMap.get(node.description_category_id) || null,
-              level,
-              hasChildren: node.children && node.children.length > 0,
-              lastSyncAt: new Date(),
-            },
-            update: {
-              parentId,
-              name: node.category_name,
-              nameZh: zhNameMap.get(node.description_category_id) || null,
-              level,
-              hasChildren: node.children && node.children.length > 0,
-              lastSyncAt: new Date(),
-            },
+        if (!seenIds.has(node.description_category_id)) {
+          seenIds.add(node.description_category_id);
+          flatNodes.push({
+            id: node.description_category_id,
+            parentId,
+            name: node.category_name,
+            nameZh: zhNameMap.get(node.description_category_id) || null,
+            level,
+            hasChildren: !!(node.children && node.children.length > 0),
           });
-          count++;
-        } catch (error: any) {
-          this.logger.error(`Failed to upsert category ${node.description_category_id}: ${error.message}`);
-          failed++;
         }
-
         if (node.children && node.children.length > 0) {
-          await flatten(node.children, node.description_category_id, level + 1);
+          collectNodes(node.children, node.description_category_id, level + 1);
         }
       }
     };
 
-    await flatten(treeDefault, null, 0);
+    collectNodes(treeDefault, null, 0);
+
+    // Sort by level so parents are inserted before children
+    flatNodes.sort((a, b) => a.level - b.level);
+
+    this.logger.log(`Collected ${flatNodes.length} unique categories, upserting...`);
+
+    let count = 0;
+    let failed = 0;
+    const now = new Date();
+
+    for (const node of flatNodes) {
+      try {
+        await this.prisma.category.upsert({
+          where: { id: node.id },
+          create: {
+            id: node.id,
+            parentId: node.parentId,
+            name: node.name,
+            nameZh: node.nameZh,
+            level: node.level,
+            hasChildren: node.hasChildren,
+            lastSyncAt: now,
+          },
+          update: {
+            parentId: node.parentId,
+            name: node.name,
+            nameZh: node.nameZh,
+            level: node.level,
+            hasChildren: node.hasChildren,
+            lastSyncAt: now,
+          },
+        });
+        count++;
+      } catch (error: any) {
+        this.logger.error(`Failed to upsert category ${node.id}: ${error.message}`);
+        failed++;
+      }
+    }
 
     this.logger.log(`Category sync complete: ${count} synced, ${failed} failed`);
     return { synced: count, failed };

@@ -93,3 +93,18 @@ export function getStatusCountsApi(storeAccountId?: string): Promise<StatusCount
     params: storeAccountId ? { storeAccountId } : {},
   });
 }
+
+export function exportProductsApi(params: {
+  storeAccountId?: string;
+  status?: string;
+  keyword?: string;
+}): Promise<any[]> {
+  return request.get('/products/export', { params });
+}
+
+export function archiveProductsApi(productIds: string[]): Promise<{ updated: number }> {
+  return request.post('/products/batch-update', {
+    productIds,
+    updates: { status: 'ARCHIVED', visible: false },
+  });
+}

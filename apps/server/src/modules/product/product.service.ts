@@ -96,12 +96,60 @@ export class ProductService {
     if (updates.costPrice !== undefined) data.costPrice = updates.costPrice;
     if (updates.visible !== undefined) data.visible = updates.visible;
     if (updates.categoryName) data.categoryName = updates.categoryName;
+    if (updates.status) data.status = updates.status;
 
     const result = await this.prisma.product.updateMany({
       where: { id: { in: productIds } },
       data,
     });
     return { updated: result.count };
+  }
+
+  /**
+   * Export products as JSON array (frontend converts to CSV).
+   */
+  async exportProducts(storeAccountId?: string, status?: string, keyword?: string) {
+    const where: Prisma.ProductWhereInput = {};
+    if (storeAccountId) where.storeAccountId = storeAccountId;
+    if (status) where.status = status as any;
+    if (keyword) {
+      where.OR = [
+        { name: { contains: keyword, mode: 'insensitive' } },
+        { offerId: { contains: keyword, mode: 'insensitive' } },
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      take: 5000,
+      include: {
+        storeAccount: { select: { storeName: true } },
+      },
+    });
+
+    return products.map((p) => ({
+      name: p.name,
+      offerId: p.offerId,
+      ozonProductId: p.ozonProductId.toString(),
+      status: p.status,
+      sellingPrice: p.sellingPrice ? Number(p.sellingPrice) : null,
+      originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
+      lowestPrice: p.lowestPrice ? Number(p.lowestPrice) : null,
+      costPrice: p.costPrice ? Number(p.costPrice) : null,
+      currencyCode: p.currencyCode,
+      totalStock: p.totalStock,
+      sales14d: p.sales14d,
+      weightGross: p.weightGross ? Number(p.weightGross) : null,
+      dimensionLength: p.dimensionLength ? Number(p.dimensionLength) : null,
+      dimensionWidth: p.dimensionWidth ? Number(p.dimensionWidth) : null,
+      dimensionHeight: p.dimensionHeight ? Number(p.dimensionHeight) : null,
+      categoryName: p.categoryName,
+      notes: p.notes,
+      storeName: p.storeAccount?.storeName,
+      ozonCreatedAt: p.ozonCreatedAt?.toISOString(),
+      lastSyncAt: p.lastSyncAt?.toISOString(),
+    }));
   }
 
   async getStatusCounts(storeAccountId?: string) {

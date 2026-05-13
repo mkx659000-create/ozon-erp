@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsBoolean, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsNumber, IsEnum, IsArray } from 'class-validator';
+import { ProductStatus } from '@prisma/client';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -16,9 +17,14 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   categoryName?: string;
+
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
 }
 
 export class BatchUpdateProductDto {
+  @IsArray()
   productIds: string[];
   updates: UpdateProductDto;
 }
@@ -26,4 +32,18 @@ export class BatchUpdateProductDto {
 export class SyncProductDto {
   @IsString()
   storeAccountId: string;
+}
+
+export class ExportProductDto {
+  @IsOptional()
+  @IsString()
+  storeAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 }

@@ -204,17 +204,21 @@ export class OrderService {
         },
       });
     } catch (error: any) {
-      this.logger.error(`Order sync failed: ${error.message}`);
-      await this.prisma.syncLog.update({
-        where: { id: syncLog.id },
-        data: {
-          status: 'FAILED',
-          errorMessage: error.message?.substring(0, 500),
-          itemsProcessed: synced,
-          itemsFailed: failed,
-          completedAt: new Date(),
-        },
-      });
+      this.logger.error(`Order sync failed: ${error.message}`, error.stack);
+      try {
+        await this.prisma.syncLog.update({
+          where: { id: syncLog.id },
+          data: {
+            status: 'FAILED',
+            errorMessage: error.message?.substring(0, 500),
+            itemsProcessed: synced,
+            itemsFailed: failed,
+            completedAt: new Date(),
+          },
+        });
+      } catch (logError: any) {
+        this.logger.error(`Failed to update sync log: ${logError.message}`);
+      }
       // Return partial result instead of throwing — the frontend shows synced/failed counts
       return { synced, failed, error: error.message || '同步失败' };
     }

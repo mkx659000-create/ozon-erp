@@ -6,6 +6,7 @@ import {
   Query,
   Body,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OrderService } from './order.service';
@@ -14,6 +15,8 @@ import { QueryOrderDto } from './dto/query-order.dto';
 @Controller('orders')
 @UseGuards(AuthGuard('jwt'))
 export class OrderController {
+  private readonly logger = new Logger(OrderController.name);
+
   constructor(private readonly orderService: OrderService) {}
 
   @Get()
@@ -41,7 +44,12 @@ export class OrderController {
   }
 
   @Post('sync')
-  sync(@Body('storeAccountId') storeAccountId: string) {
-    return this.orderService.syncFromOzon(storeAccountId);
+  async sync(@Body('storeAccountId') storeAccountId: string) {
+    try {
+      return await this.orderService.syncFromOzon(storeAccountId);
+    } catch (error: any) {
+      this.logger.error(`Order sync controller error: ${error.message}`, error.stack);
+      return { synced: 0, failed: 0, error: error.message || '同步失败' };
+    }
   }
 }

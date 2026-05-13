@@ -8,13 +8,11 @@ import {
   Query,
   UseGuards,
   Logger,
-  Res,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ProductService } from './product.service';
 import { QueryProductDto } from './dto/query-product.dto';
-import { UpdateProductDto, BatchUpdateProductDto, SyncProductDto, ExportProductDto } from './dto/update-product.dto';
+import { UpdateProductDto, BatchUpdateProductDto, SyncProductDto } from './dto/update-product.dto';
 
 @Controller('products')
 @UseGuards(AuthGuard('jwt'))
@@ -33,6 +31,20 @@ export class ProductController {
     return this.productService.getStatusCounts(storeAccountId);
   }
 
+  @Get('export')
+  async exportProducts(
+    @Query('storeAccountId') storeAccountId?: string,
+    @Query('status') status?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    try {
+      return await this.productService.exportProducts(storeAccountId, status, keyword);
+    } catch (error: any) {
+      this.logger.error(`Export error: ${error.message}`);
+      return [];
+    }
+  }
+
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.productService.findById(id);
@@ -46,20 +58,6 @@ export class ProductController {
   @Post('batch-update')
   batchUpdate(@Body() dto: BatchUpdateProductDto) {
     return this.productService.batchUpdate(dto);
-  }
-
-  @Get('export')
-  async exportProducts(
-    @Query('storeAccountId') storeAccountId?: string,
-    @Query('status') status?: string,
-    @Query('keyword') keyword?: string,
-  ) {
-    try {
-      return await this.productService.exportProducts(storeAccountId, status, keyword);
-    } catch (error: any) {
-      this.logger.error(`Export error: ${error.message}`);
-      return [];
-    }
   }
 
   @Post('sync')

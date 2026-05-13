@@ -143,8 +143,8 @@ export class CategoryService {
     const zhNameMap = new Map<number, string>();
     this.flattenTreeNames(treeZh, zhNameMap);
 
-    // Flatten tree into a level-ordered list to avoid foreign key issues.
-    // Also deduplicate — Ozon tree can have same category_id under multiple parents.
+    // Two-pass approach: first upsert all nodes without parentId,
+    // then update parentId in a second pass. This avoids FK constraint violations.
     interface FlatNode {
       id: number;
       parentId: number | null;
@@ -182,22 +182,20 @@ export class CategoryService {
 
     collectNodes(treeDefault, null, 0);
 
-    // Sort by level so parents are inserted before children
-    flatNodes.sort((a, b) => a.level - b.level);
-
-    this.logger.log(`Collected ${flatNodes.length} unique categories, upserting...`);
+    this.logger.log(`Collected ${flatNodes.length} unique categories`);
 
     let count = 0;
     let failed = 0;
     const now = new Date();
 
+    // Pass 1: Upsert all categories WITHOUT parentId (avoids FK errors)
     for (const node of flatNodes) {
       try {
         await this.prisma.category.upsert({
           where: { id: node.id },
           create: {
             id: node.id,
-            parentId: node.parentId,
+            parentId: null,
             name: node.name,
             nameZh: node.nameZh,
             level: node.level,
@@ -205,7 +203,6 @@ export class CategoryService {
             lastSyncAt: now,
           },
           update: {
-            parentId: node.parentId,
             name: node.name,
             nameZh: node.nameZh,
             level: node.level,
@@ -215,13 +212,32 @@ export class CategoryService {
         });
         count++;
       } catch (error: any) {
-        this.logger.error(`Failed to upsert category ${node.id}: ${error.message}`);
+        this.logger.error(`Pass 1 failed for category ${node.id}: ${error.message}`);
         failed++;
       }
     }
 
-    this.logger.log(`Category sync complete: ${count} synced, ${failed} failed`);
-    return { synced: count, failed };
+    this.logger.log(`Pass 1 complete: ${count} created/updated`);
+
+    // Pass 2: Set parentId for all categories (parents now exist)
+    let parentUpdated = 0;
+    for (const node of flatNodes) {
+      if (node.parentId !== null && seenIds.has(node.parentId)) {
+        try {
+          await this.prisma.category.update({
+            where: { id: node.id },
+            data: { parentId: node.parentId },
+          });
+          parentUpdated++;
+        } catch (error: any) {
+          // Parent might not exist if it was skipped; log but don't count as failure
+          this.logger.warn(`Pass 2: failed to set parent for ${node.id}: ${error.message}`);
+        }
+      }
+    }
+
+    this.logger.log(`Category sync complete: ${count} synced, ${failed} failed, ${parentUpdated} parents linked`);
+    return { synced: count, failed, parentUpdated };
   }
 
   /**

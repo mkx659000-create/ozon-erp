@@ -122,7 +122,6 @@ function handleMenuClick(info: any) {
 
 function handleStoreChange(value: any) {
   storeAccountStore.setActiveStore(String(value));
-  window.location.reload();
 }
 
 function handleLogout() {

@@ -124,7 +124,7 @@ export class ProductService {
   /**
    * Sync products from Ozon API to local database.
    */
-  async syncFromOzon(storeAccountId: string): Promise<{ synced: number; failed: number }> {
+  async syncFromOzon(storeAccountId: string): Promise<{ synced: number; failed: number; error?: string }> {
     const store = await this.prisma.storeAccount.findUnique({
       where: { id: storeAccountId },
     });

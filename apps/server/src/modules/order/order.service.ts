@@ -106,6 +106,7 @@ export class OrderService {
     // Get the last sync time, default to 30 days ago
     const lastSync = store.lastSyncAt || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const since = lastSync.toISOString();
+    const to = new Date().toISOString();
 
     const syncLog = await this.prisma.syncLog.create({
       data: {
@@ -120,8 +121,8 @@ export class OrderService {
     let failed = 0;
 
     try {
-      const postings = await this.ozonOrderApi.listAllFbsPostingsSince(credentials, since);
-      this.logger.log(`Found ${postings.length} postings since ${since}`);
+      const postings = await this.ozonOrderApi.listAllFbsPostingsSince(credentials, since, to);
+      this.logger.log(`Found ${postings.length} postings from ${since} to ${to}`);
 
       for (const posting of postings) {
         try {
@@ -203,15 +204,19 @@ export class OrderService {
         },
       });
     } catch (error: any) {
+      this.logger.error(`Order sync failed: ${error.message}`);
       await this.prisma.syncLog.update({
         where: { id: syncLog.id },
         data: {
           status: 'FAILED',
-          errorMessage: error.message,
+          errorMessage: error.message?.substring(0, 500),
+          itemsProcessed: synced,
+          itemsFailed: failed,
           completedAt: new Date(),
         },
       });
-      throw error;
+      // Return partial result instead of throwing — the frontend shows synced/failed counts
+      return { synced, failed, error: error.message || '同步失败' };
     }
 
     return { synced, failed };

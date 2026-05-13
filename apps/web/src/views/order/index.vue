@@ -126,11 +126,15 @@ async function handleSync() {
   }
   syncLoading.value = true;
   try {
-    const res = await syncOrdersApi(storeAccountId.value);
-    message.success(`同步完成：成功 ${res.synced}，失败 ${res.failed}`);
+    const res: any = await syncOrdersApi(storeAccountId.value);
+    if (res.error) {
+      message.warning(`同步部分完成：成功 ${res.synced}，失败 ${res.failed}。${res.error}`);
+    } else {
+      message.success(`同步完成：成功 ${res.synced}，失败 ${res.failed}`);
+    }
     await loadAll();
   } catch {
-    message.error('同步失败');
+    message.error('同步请求失败，请稍后重试');
   } finally {
     syncLoading.value = false;
   }

@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
 const OZON_API_BASE = 'https://api-seller.ozon.ru';
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 2000;
 
 export interface OzonCredentials {
   clientId: string;
@@ -33,9 +33,10 @@ export class OzonApiService {
 
         config.__retryCount = config.__retryCount || 0;
 
+        const retryableStatuses = [429, 502, 503, 504];
         if (
           config.__retryCount < MAX_RETRIES &&
-          error.response?.status === 429
+          retryableStatuses.includes(error.response?.status ?? 0)
         ) {
           config.__retryCount += 1;
           const delay =

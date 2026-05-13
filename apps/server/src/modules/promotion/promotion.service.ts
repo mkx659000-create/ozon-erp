@@ -285,15 +285,18 @@ export class PromotionService {
         },
       });
     } catch (error: any) {
+      this.logger.error(`Promotion sync failed: ${error.message}`);
       await this.prisma.syncLog.update({
         where: { id: syncLog.id },
         data: {
           status: 'FAILED',
-          errorMessage: error.message,
+          errorMessage: error.message?.substring(0, 500),
+          itemsProcessed: synced,
+          itemsFailed: failed,
           completedAt: new Date(),
         },
       });
-      throw error;
+      return { synced, failed, error: error.message || '同步失败' };
     }
 
     return { synced, failed };

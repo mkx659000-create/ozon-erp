@@ -151,11 +151,15 @@ async function handleSync() {
   }
   syncLoading.value = true;
   try {
-    const result = await syncProductsApi(storeId);
-    message.success(`同步完成：成功 ${result.synced} 个，失败 ${result.failed} 个`);
+    const result: any = await syncProductsApi(storeId);
+    if (result.error) {
+      message.warning(`同步部分完成：成功 ${result.synced} 个，失败 ${result.failed} 个。${result.error}`);
+    } else {
+      message.success(`同步完成：成功 ${result.synced} 个，失败 ${result.failed} 个`);
+    }
     await Promise.all([fetchProducts(), fetchStatusCounts()]);
   } catch {
-    // handled by interceptor
+    message.error('同步请求失败，请稍后重试');
   } finally {
     syncLoading.value = false;
   }

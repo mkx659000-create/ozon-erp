@@ -25,7 +25,9 @@ import {
   testConnectionApi,
   type StoreAccount,
 } from '@/api/store-account/index';
+import { useStoreAccountStore } from '@/store';
 
+const storeAccountStore = useStoreAccountStore();
 const loading = ref(false);
 const stores = ref<StoreAccount[]>([]);
 const showModal = ref(false);
@@ -74,6 +76,8 @@ async function handleCreate() {
     showModal.value = false;
     form.value = { storeName: '', ozonClientId: '', ozonApiKey: '' };
     await fetchStores();
+    // Refresh the global store so the header selector updates immediately
+    await storeAccountStore.fetchStores();
   } finally {
     formLoading.value = false;
   }
@@ -93,6 +97,8 @@ async function handleDelete(id: string) {
     await deleteStoreAccountApi(id);
     message.success('删除成功');
     await fetchStores();
+    // Refresh the global store so the header selector updates immediately
+    await storeAccountStore.fetchStores();
   } catch {
     // handled by interceptor
   }

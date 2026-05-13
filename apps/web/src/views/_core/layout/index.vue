@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   Layout,
@@ -38,6 +38,14 @@ const storeAccountStore = useStoreAccountStore();
 const collapsed = ref(false);
 const selectedKeys = computed(() => [route.name as string]);
 
+async function loadStores() {
+  try {
+    await storeAccountStore.fetchStores();
+  } catch {
+    // Backend not available
+  }
+}
+
 onMounted(async () => {
   if (!userStore.userInfo) {
     try {
@@ -46,10 +54,13 @@ onMounted(async () => {
       // Backend not available, continue with layout render
     }
   }
-  try {
-    await storeAccountStore.fetchStores();
-  } catch {
-    // Backend not available
+  await loadStores();
+});
+
+// Re-fetch stores when navigating between pages in case stores were added/removed
+watch(() => route.path, () => {
+  if (storeAccountStore.stores.length === 0) {
+    loadStores();
   }
 });
 
@@ -133,7 +144,7 @@ function handleLogout() {
         <div class="header-right">
           <Select
             v-if="storeAccountStore.stores.length > 0"
-            :value="storeAccountStore.activeStoreId"
+            :value="storeAccountStore.activeStoreId || undefined"
             style="width: 200px; margin-right: 16px"
             placeholder="选择店铺"
             @change="handleStoreChange"
@@ -146,6 +157,14 @@ function handleLogout() {
               {{ store.storeName }}
             </SelectOption>
           </Select>
+          <Button
+            v-else
+            type="link"
+            style="margin-right: 16px; color: #faad14"
+            @click="router.push({ name: 'StoreAccounts' })"
+          >
+            <ShopOutlined /> 请先添加店铺
+          </Button>
 
           <Dropdown>
             <Space class="user-info" style="cursor: pointer">

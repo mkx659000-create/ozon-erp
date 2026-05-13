@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsBoolean, IsNumber, IsEnum, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsNumber, IsEnum, IsArray, ValidateNested, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ProductStatus } from '@prisma/client';
 
 export class UpdateProductDto {
@@ -25,7 +26,11 @@ export class UpdateProductDto {
 
 export class BatchUpdateProductDto {
   @IsArray()
+  @IsString({ each: true })
   productIds: string[];
+
+  @ValidateNested()
+  @Type(() => UpdateProductDto)
   updates: UpdateProductDto;
 }
 

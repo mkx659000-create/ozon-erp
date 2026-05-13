@@ -36,6 +36,7 @@ import {
   type StoreAccount,
 } from '@/api/store-account/index';
 import { useStoreAccountStore } from '@/store';
+import dayjs from 'dayjs';
 
 const storeAccountStore = useStoreAccountStore();
 const loading = ref(false);
@@ -197,7 +198,7 @@ onMounted(fetchStores);
 
         <template v-if="column.key === 'lastSyncAt'">
           <span v-if="record.lastSyncAt" style="font-size: 13px; color: #595959">
-            {{ record.lastSyncAt }}
+            {{ dayjs(record.lastSyncAt).format('YYYY-MM-DD HH:mm:ss') }}
           </span>
           <span v-else style="color: #d9d9d9; font-size: 13px">从未同步</span>
         </template>

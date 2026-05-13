@@ -26,6 +26,7 @@ import {
   SendOutlined,
   RightOutlined,
   LeftOutlined,
+  SyncOutlined,
 } from '@ant-design/icons-vue';
 import { useStoreAccountStore } from '@/store';
 import { useRouter } from 'vue-router';
@@ -35,7 +36,7 @@ import {
   type CategoryAttribute,
   type PublishProductParams,
 } from '@/api/product-publish';
-import { getFullCategoryTreeApi, type Category } from '@/api/category';
+import { getFullCategoryTreeApi, syncCategoriesApi, type Category } from '@/api/category';
 
 const router = useRouter();
 const storeAccountStore = useStoreAccountStore();
@@ -48,6 +49,7 @@ const currentStep = ref(0);
 /* ---- category ---- */
 const categoryTree = ref<any[]>([]);
 const categoryLoading = ref(false);
+const categorySyncLoading = ref(false);
 const selectedCategoryId = ref<number | undefined>(undefined);
 const categoryAttributes = ref<CategoryAttribute[]>([]);
 const attrLoading = ref(false);
@@ -107,6 +109,23 @@ async function loadCategoryAttributes(categoryId: number) {
     categoryAttributes.value = [];
   } finally {
     attrLoading.value = false;
+  }
+}
+
+async function handleSyncCategories() {
+  if (!storeAccountId.value) {
+    message.warning('请先选择店铺');
+    return;
+  }
+  categorySyncLoading.value = true;
+  try {
+    const result: any = await syncCategoriesApi(storeAccountId.value);
+    message.success(`分类同步完成：${result.synced} 个分类`);
+    await loadCategories();
+  } catch {
+    message.error('分类同步失败');
+  } finally {
+    categorySyncLoading.value = false;
   }
 }
 
@@ -239,8 +258,27 @@ loadCategories();
       <!-- Step 1: Category Selection -->
       <div v-if="currentStep === 0">
         <div class="step-content">
-          <h3 class="step-title">选择商品分类</h3>
-          <p class="step-desc">请选择商品所属的 Ozon 分类。只能选择最末级分类。</p>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start">
+            <div>
+              <h3 class="step-title">选择商品分类</h3>
+              <p class="step-desc">请选择商品所属的 Ozon 分类。只能选择最末级分类。</p>
+            </div>
+            <Button size="small" :loading="categorySyncLoading" @click="handleSyncCategories">
+              <template #icon><SyncOutlined /></template>
+              同步分类
+            </Button>
+          </div>
+
+          <Alert
+            v-if="categoryTree.length === 0 && !categoryLoading"
+            type="info"
+            show-icon
+            style="margin-bottom: 16px; border-radius: 8px"
+          >
+            <template #message>
+              分类数据为空，请先点击"同步分类"按钮从Ozon同步分类数据。
+            </template>
+          </Alert>
 
           <Spin :spinning="categoryLoading">
             <TreeSelect

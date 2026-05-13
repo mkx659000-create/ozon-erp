@@ -7,6 +7,7 @@ import {
   Query,
   Body,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PromotionService } from './promotion.service';
@@ -21,6 +22,8 @@ import {
 @Controller('promotions')
 @UseGuards(AuthGuard('jwt'))
 export class PromotionController {
+  private readonly logger = new Logger(PromotionController.name);
+
   constructor(private readonly promotionService: PromotionService) {}
 
   /**
@@ -59,8 +62,13 @@ export class PromotionController {
    * POST /promotions/sync — sync promotions from Ozon API.
    */
   @Post('sync')
-  sync(@Body() dto: SyncPromotionDto) {
-    return this.promotionService.syncFromOzon(dto.storeAccountId);
+  async sync(@Body() dto: SyncPromotionDto) {
+    try {
+      return await this.promotionService.syncFromOzon(dto.storeAccountId);
+    } catch (error: any) {
+      this.logger.error(`Promotion sync controller error: ${error.message}`, error.stack);
+      return { synced: 0, failed: 0, error: error.message || '同步失败' };
+    }
   }
 
   /**

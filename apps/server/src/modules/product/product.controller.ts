@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ProductService } from './product.service';
@@ -16,6 +17,8 @@ import { UpdateProductDto, BatchUpdateProductDto, SyncProductDto } from './dto/u
 @Controller('products')
 @UseGuards(AuthGuard('jwt'))
 export class ProductController {
+  private readonly logger = new Logger(ProductController.name);
+
   constructor(private productService: ProductService) {}
 
   @Get()
@@ -44,7 +47,12 @@ export class ProductController {
   }
 
   @Post('sync')
-  sync(@Body() dto: SyncProductDto) {
-    return this.productService.syncFromOzon(dto.storeAccountId);
+  async sync(@Body() dto: SyncProductDto) {
+    try {
+      return await this.productService.syncFromOzon(dto.storeAccountId);
+    } catch (error: any) {
+      this.logger.error(`Product sync controller error: ${error.message}`, error.stack);
+      return { synced: 0, failed: 0, error: error.message || '同步失败' };
+    }
   }
 }

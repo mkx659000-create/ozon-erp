@@ -103,9 +103,18 @@ export class OrderService {
 
     const credentials = { clientId: store.ozonClientId, apiKey: store.ozonApiKey };
 
-    // Get the last sync time, default to 30 days ago
-    const lastSync = store.lastSyncAt || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const since = lastSync.toISOString();
+    // Use the last successful ORDER sync time, NOT store.lastSyncAt (which is shared with product sync)
+    const lastOrderSync = await this.prisma.syncLog.findFirst({
+      where: {
+        storeAccountId,
+        syncType: 'ORDER',
+        status: { in: ['SUCCESS', 'PARTIAL_FAILURE'] },
+      },
+      orderBy: { completedAt: 'desc' },
+      select: { completedAt: true },
+    });
+    const lastSyncTime = lastOrderSync?.completedAt || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const since = lastSyncTime.toISOString();
     const to = new Date().toISOString();
 
     const syncLog = await this.prisma.syncLog.create({

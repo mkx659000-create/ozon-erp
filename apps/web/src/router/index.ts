@@ -55,6 +55,20 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/finance/index.vue'),
         meta: { title: '财务管理' },
       },
+      // Warehouse
+      {
+        path: 'warehouse',
+        name: 'Warehouse',
+        component: () => import('@/views/warehouse/index.vue'),
+        meta: { title: '仓库管理' },
+      },
+      // Returns
+      {
+        path: 'returns',
+        name: 'Returns',
+        component: () => import('@/views/returns/index.vue'),
+        meta: { title: '退货管理' },
+      },
       // Analytics
       {
         path: 'analytics',

@@ -6,6 +6,7 @@ import { PRODUCT_SYNC_QUEUE } from '../processors/product-sync.processor';
 import { PROMOTION_SYNC_QUEUE } from '../processors/promotion-sync.processor';
 import { STOCK_SYNC_QUEUE } from '../processors/stock-sync.processor';
 import { FINANCE_SYNC_QUEUE } from '../processors/finance-sync.processor';
+import { RETURNS_SYNC_QUEUE } from '../processors/returns-sync.processor';
 
 @Injectable()
 export class SyncSchedulerService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(PROMOTION_SYNC_QUEUE) private promotionSyncQueue: Queue,
     @InjectQueue(STOCK_SYNC_QUEUE) private stockSyncQueue: Queue,
     @InjectQueue(FINANCE_SYNC_QUEUE) private financeSyncQueue: Queue,
+    @InjectQueue(RETURNS_SYNC_QUEUE) private returnsSyncQueue: Queue,
     private prisma: PrismaService,
   ) {}
 
@@ -95,6 +97,19 @@ export class SyncSchedulerService implements OnModuleInit {
         },
       );
 
+      // Returns sync — every 4 hours
+      await this.returnsSyncQueue.add(
+        `returns-sync-${store.id}`,
+        { storeAccountId: store.id },
+        {
+          ...jobOptions,
+          repeat: {
+            pattern: '0 */4 * * *',
+          },
+          jobId: `returns-sync-${store.id}`,
+        },
+      );
+
       this.logger.log(`Registered sync jobs for store "${store.storeName}" (${store.id})`);
     }
   }
@@ -141,6 +156,19 @@ export class SyncSchedulerService implements OnModuleInit {
     return job;
   }
 
+  async triggerReturnsSync(storeAccountId: string) {
+    const job = await this.returnsSyncQueue.add(
+      `manual-returns-sync-${storeAccountId}`,
+      { storeAccountId },
+      {
+        removeOnComplete: { count: 10 },
+        removeOnFail: { count: 20 },
+      },
+    );
+    this.logger.log(`Triggered manual returns sync job ${job.id} for store ${storeAccountId}`);
+    return job;
+  }
+
   async triggerFinanceSync(storeAccountId: string) {
     const job = await this.financeSyncQueue.add(
       `manual-finance-sync-${storeAccountId}`,
@@ -158,11 +186,12 @@ export class SyncSchedulerService implements OnModuleInit {
    * Get sync job status for a store.
    */
   async getSyncStatus(storeAccountId: string) {
-    const [productJobs, stockJobs, promoJobs, financeJobs] = await Promise.all([
+    const [productJobs, stockJobs, promoJobs, financeJobs, returnsJobs] = await Promise.all([
       this.productSyncQueue.getJobs(['active', 'waiting', 'delayed']),
       this.stockSyncQueue.getJobs(['active', 'waiting', 'delayed']),
       this.promotionSyncQueue.getJobs(['active', 'waiting', 'delayed']),
       this.financeSyncQueue.getJobs(['active', 'waiting', 'delayed']),
+      this.returnsSyncQueue.getJobs(['active', 'waiting', 'delayed']),
     ]);
 
     const filter = (jobs: any[]) =>
@@ -180,6 +209,7 @@ export class SyncSchedulerService implements OnModuleInit {
       stock: filter(stockJobs),
       promotion: filter(promoJobs),
       finance: filter(financeJobs),
+      returns: filter(returnsJobs),
     };
   }
 
@@ -187,7 +217,7 @@ export class SyncSchedulerService implements OnModuleInit {
    * Remove all repeatable jobs to allow re-registration.
    */
   private async cleanRepeatableJobs() {
-    const queues = [this.productSyncQueue, this.promotionSyncQueue, this.stockSyncQueue, this.financeSyncQueue];
+    const queues = [this.productSyncQueue, this.promotionSyncQueue, this.stockSyncQueue, this.financeSyncQueue, this.returnsSyncQueue];
     for (const queue of queues) {
       const repeatables = await queue.getRepeatableJobs();
       for (const r of repeatables) {

@@ -47,6 +47,12 @@ export class SyncController {
     return { jobId: job.id, message: '财务同步任务已启动' };
   }
 
+  @Post('returns')
+  async triggerReturnsSync(@Body() dto: TriggerSyncDto) {
+    const job = await this.syncScheduler.triggerReturnsSync(dto.storeAccountId);
+    return { jobId: job.id, message: '退货同步任务已启动' };
+  }
+
   /**
    * GET /sync/status — get sync job status for a store.
    */

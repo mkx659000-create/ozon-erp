@@ -5,10 +5,12 @@ import { ProductSyncProcessor, PRODUCT_SYNC_QUEUE } from './processors/product-s
 import { PromotionSyncProcessor, PROMOTION_SYNC_QUEUE } from './processors/promotion-sync.processor';
 import { StockSyncProcessor, STOCK_SYNC_QUEUE } from './processors/stock-sync.processor';
 import { FinanceSyncProcessor, FINANCE_SYNC_QUEUE } from './processors/finance-sync.processor';
+import { ReturnsSyncProcessor, RETURNS_SYNC_QUEUE } from './processors/returns-sync.processor';
 import { SyncSchedulerService } from './schedulers/sync-scheduler.service';
 import { SyncController } from './sync.controller';
 import { ProductModule } from '../modules/product/product.module';
 import { FinanceModule } from '../modules/finance/finance.module';
+import { ReturnsModule } from '../modules/returns/returns.module';
 
 @Module({
   imports: [
@@ -37,10 +39,12 @@ import { FinanceModule } from '../modules/finance/finance.module';
       { name: PROMOTION_SYNC_QUEUE },
       { name: STOCK_SYNC_QUEUE },
       { name: FINANCE_SYNC_QUEUE },
+      { name: RETURNS_SYNC_QUEUE },
     ),
 
     ProductModule,
     FinanceModule,
+    ReturnsModule,
   ],
   controllers: [SyncController],
   providers: [
@@ -48,6 +52,7 @@ import { FinanceModule } from '../modules/finance/finance.module';
     PromotionSyncProcessor,
     StockSyncProcessor,
     FinanceSyncProcessor,
+    ReturnsSyncProcessor,
     SyncSchedulerService,
   ],
   exports: [SyncSchedulerService, BullModule],

@@ -14,6 +14,8 @@ import { ProductPublishModule } from './modules/product-publish/product-publish.
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { OperationLogModule } from './modules/operation-log/operation-log.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { WarehouseModule } from './modules/warehouse/warehouse.module';
+import { ReturnsModule } from './modules/returns/returns.module';
 import { JobsModule } from './jobs/jobs.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -34,6 +36,8 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     DashboardModule,
     OperationLogModule,
     FinanceModule,
+    WarehouseModule,
+    ReturnsModule,
     JobsModule,
   ],
   providers: [

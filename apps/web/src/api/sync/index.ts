@@ -18,6 +18,7 @@ export interface SyncStatusResponse {
     stock: any[];
     promotion: any[];
     finance: any[];
+    returns: any[];
   };
   recentLogs: SyncLog[];
 }
@@ -53,6 +54,13 @@ export function getSyncStatusApi(storeAccountId: string) {
 /** Trigger manual finance sync */
 export function triggerFinanceSyncApi(storeAccountId: string) {
   return request.post<any, { jobId: string; message: string }>('/sync/finance', {
+    storeAccountId,
+  });
+}
+
+/** Trigger manual returns sync */
+export function triggerReturnsSyncApi(storeAccountId: string) {
+  return request.post<any, { jobId: string; message: string }>('/sync/returns', {
     storeAccountId,
   });
 }

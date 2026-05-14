@@ -230,19 +230,36 @@ export class ProductService {
     let failed = 0;
 
     try {
-      // Step 1: Get all product IDs using ALL visibility to include every product
       this.logger.log(`Starting product sync for store ${store.storeName}`);
-      const productList = await this.ozonProductApi.listAllProducts(credentials, 'ALL');
-      this.logger.log(`Found ${productList.length} products on Ozon (visibility=ALL)`);
 
-      // Step 2: Get detailed info in batches
+      // Step 1: Get all product IDs
+      const productList = await this.ozonProductApi.listAllProducts(credentials, 'ALL');
+      this.logger.log(`Found ${productList.length} products on Ozon`);
+
+      // Step 2: Build visibility map by querying each category
+      const visibilityMap = new Map<number, ProductStatus>();
+      const visCategories: Array<{ vis: string; status: ProductStatus }> = [
+        { vis: 'STATE_FAILED', status: ProductStatus.MODERATION_FAILED },
+        { vis: 'NOT_MODERATED', status: ProductStatus.MODERATION },
+        { vis: 'DISABLED', status: ProductStatus.REMOVED },
+        { vis: 'EMPTY_STOCK', status: ProductStatus.OUT_OF_STOCK },
+      ];
+      for (const { vis, status } of visCategories) {
+        try {
+          const ids = await this.ozonProductApi.listAllProducts(credentials, vis);
+          for (const p of ids) visibilityMap.set(p.product_id, status);
+          this.logger.log(`  ${vis}: ${ids.length} products`);
+        } catch { /* skip */ }
+      }
+
+      // Step 3: Get detailed info in batches
       const productIds = productList.map((p) => p.product_id);
       const productInfos = await this.ozonProductApi.getProductInfoBatch(
         credentials,
         productIds,
       );
 
-      // Step 2.5: Get accurate stock info from /v4/product/info/stocks
+      // Step 4: Get accurate stock info from /v4/product/info/stocks
       const stockInfos = await this.ozonProductApi.getStockInfo(credentials);
       const stockMap = new Map<number, number>();
       for (const item of stockInfos) {
@@ -251,16 +268,10 @@ export class ProductService {
       }
       this.logger.log(`Fetched stock info for ${stockInfos.length} products`);
 
-      // Log sample data for debugging
-      if (productInfos.length > 0) {
-        const sample = productInfos[0];
-        this.logger.log(`Sample product: id=${sample.id}, state=${sample.status?.state}, visible=${sample.visible}, stocks=${JSON.stringify(sample.stocks)}, stockFromV4=${stockMap.get(sample.id)}`);
-      }
-
-      // Step 3: Upsert into local database
+      // Step 5: Upsert into local database
       for (const info of productInfos) {
         try {
-          await this.upsertProduct(storeAccountId, info, stockMap);
+          await this.upsertProduct(storeAccountId, info, stockMap, visibilityMap);
           synced++;
         } catch (error: any) {
           this.logger.error(
@@ -314,11 +325,7 @@ export class ProductService {
     return { synced, failed };
   }
 
-  private async upsertProduct(storeAccountId: string, info: any, stockMap?: Map<number, number>) {
-    const ozonStatus = info.status?.state || info.state || '';
-    const isArchived = info.is_archived || false;
-    const isFailed = info.status?.is_failed || false;
-
+  private async upsertProduct(storeAccountId: string, info: any, stockMap?: Map<number, number>, visibilityMap?: Map<number, ProductStatus>) {
     const primaryImg = Array.isArray(info.primary_image)
       ? info.primary_image[0]
       : info.primary_image || info.images?.[0] || null;
@@ -333,7 +340,10 @@ export class ProductService {
       }
     }
 
-    const status = this.mapOzonStatus(ozonStatus, isArchived, totalStock, isFailed);
+    // Use Ozon visibility-based status (most accurate), with priority:
+    // STATE_FAILED > NOT_MODERATED > DISABLED > EMPTY_STOCK > ON_SALE
+    const status = visibilityMap?.get(info.id) || ProductStatus.ON_SALE;
+    const isArchived = info.is_archived || false;
 
     const primarySku = info.sku || info.sources?.[0]?.sku || 0;
 

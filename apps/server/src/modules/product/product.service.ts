@@ -179,7 +179,30 @@ export class ProductService {
     const ozonCounts = await this.ozonProductApi.getVisibilityCounts(credentials);
     const localCounts = await this.getStatusCounts(storeAccountId);
 
-    return { ozon: ozonCounts, local: localCounts };
+    // Sample raw status from different visibility categories
+    const samples: Record<string, any[]> = {};
+    for (const vis of ['STATE_FAILED', 'NOT_MODERATED', 'DISABLED']) {
+      try {
+        const ids = await this.ozonProductApi.listAllProducts(credentials, vis);
+        if (ids.length > 0) {
+          const sampleIds = ids.slice(0, 2).map(p => p.product_id);
+          const infos = await this.ozonProductApi.getProductInfoBatch(credentials, sampleIds);
+          samples[vis] = infos.map((info: any) => ({
+            id: info.id,
+            name: info.name?.substring(0, 30),
+            state: info.status?.state,
+            state_failed: info.status?.state_failed,
+            moderate_status: info.status?.moderate_status,
+            validation_state: info.status?.validation_state,
+            is_failed: info.status?.is_failed,
+            visible: info.visible,
+            is_archived: (info as any).is_archived,
+          }));
+        }
+      } catch { /* skip */ }
+    }
+
+    return { ozon: ozonCounts, local: localCounts, samples };
   }
 
   /**

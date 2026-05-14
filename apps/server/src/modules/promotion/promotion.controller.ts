@@ -50,11 +50,13 @@ export class PromotionController {
     @Param('id') id: string,
     @Query('page') page?: number,
     @Query('pageSize') pageSize?: number,
+    @Query('productId') productId?: string,
   ) {
     return this.promotionService.getEditActivityProducts(
       id,
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 100,
+      productId,
     );
   }
 

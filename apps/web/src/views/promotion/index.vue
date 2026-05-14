@@ -53,6 +53,7 @@ const statusCounts = ref<StatusCounts>({ total: 0, joined: 0, notJoined: 0 });
 /* edit-activity modal */
 const editModalVisible = ref(false);
 const editPromotionId = ref('');
+const editProductId = ref<string | undefined>(undefined);
 
 /* ---- computed ---- */
 const storeAccountId = computed(() => storeAccountStore.activeStoreId || '');
@@ -150,6 +151,7 @@ function handleEditActivity() {
   const first = dataSource.value.find((d) => d.id === selectedRowKeys.value[0]);
   if (first) {
     editPromotionId.value = first.promotionId;
+    editProductId.value = undefined;
     editModalVisible.value = true;
   }
 }
@@ -276,6 +278,7 @@ watch(storeAccountId, () => {
           {{ tab.label }}
           <Badge
             :count="tab.count"
+            :overflowCount="99999"
             :numberStyle="{
               backgroundColor: tab.key === activeTab ? '#1890ff' : '#f0f0f0',
               color: tab.key === activeTab ? '#fff' : '#8c8c8c',
@@ -424,7 +427,7 @@ watch(storeAccountId, () => {
           <Button
             type="link"
             size="small"
-            @click="() => { editPromotionId = record.promotionId; editModalVisible = true; }"
+            @click="() => { editPromotionId = record.promotionId; editProductId = record.productId; editModalVisible = true; }"
           >
             编辑
           </Button>
@@ -436,6 +439,7 @@ watch(storeAccountId, () => {
     <EditActivityModal
       v-model:visible="editModalVisible"
       :promotionId="editPromotionId"
+      :productId="editProductId"
       @save="handleEditModalSave"
     />
   </div>

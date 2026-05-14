@@ -26,6 +26,7 @@ import {
 const props = defineProps<{
   visible: boolean;
   promotionId: string;
+  productId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -78,7 +79,7 @@ async function loadProducts() {
   if (!props.promotionId) return;
   loading.value = true;
   try {
-    const res = await getEditActivityProductsApi(props.promotionId, currentPage.value, pageSize.value);
+    const res = await getEditActivityProductsApi(props.promotionId, currentPage.value, pageSize.value, props.productId);
     dataSource.value = res.items.map((item: PromotionProduct) => ({
       id: item.id,
       productId: item.productId,

@@ -132,12 +132,14 @@ export class PromotionService {
   /**
    * Get products for the edit activity modal (one specific promotion).
    */
-  async getEditActivityProducts(promotionId: string, page: number = 1, pageSize: number = 100) {
+  async getEditActivityProducts(promotionId: string, page: number = 1, pageSize: number = 100, productId?: string) {
     const skip = (page - 1) * pageSize;
+    const where: any = { promotionId };
+    if (productId) where.productId = productId;
 
     const [items, total] = await Promise.all([
       this.prisma.promotionProduct.findMany({
-        where: { promotionId },
+        where,
         skip,
         take: pageSize,
         include: {
@@ -157,7 +159,7 @@ export class PromotionService {
           },
         },
       }),
-      this.prisma.promotionProduct.count({ where: { promotionId } }),
+      this.prisma.promotionProduct.count({ where }),
     ]);
 
     return new PaginatedResult(items, total, page, pageSize);

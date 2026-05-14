@@ -92,10 +92,11 @@ export function getEditActivityProductsApi(
   promotionId: string,
   page = 1,
   pageSize = 100,
+  productId?: string,
 ) {
   return request.get<any, PaginatedResult<PromotionProduct>>(
     `/promotions/${promotionId}/products`,
-    { params: { page, pageSize } },
+    { params: { page, pageSize, productId } },
   );
 }
 

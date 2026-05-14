@@ -213,6 +213,7 @@ watch(storeAccountId, () => {
           {{ tab.label }}
           <Badge
             :count="tab.count"
+            :overflowCount="99999"
             :numberStyle="{
               backgroundColor: tab.key === activeTab ? '#1890ff' : '#f0f0f0',
               color: tab.key === activeTab ? '#fff' : '#8c8c8c',

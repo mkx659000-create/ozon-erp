@@ -77,12 +77,15 @@ const publishResult = ref<{ taskId?: number; message?: string; error?: string } 
 
 /* ---- transform category tree for TreeSelect ---- */
 function transformTree(nodes: Category[]): any[] {
-  return nodes.map((n) => ({
-    value: n.id,
-    title: n.nameZh ? `${n.nameZh} (${n.name})` : n.name,
-    children: n.children && n.children.length > 0 ? transformTree(n.children) : undefined,
-    selectable: !n.hasChildren,
-  }));
+  return nodes.map((n) => {
+    const hasActualChildren = n.children && n.children.length > 0;
+    return {
+      value: n.id,
+      title: n.nameZh ? `${n.nameZh} (${n.name})` : n.name,
+      children: hasActualChildren ? transformTree(n.children!) : undefined,
+      selectable: !hasActualChildren,
+    };
+  });
 }
 
 async function loadCategories() {

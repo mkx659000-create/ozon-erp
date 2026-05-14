@@ -262,22 +262,28 @@ export class ProductService {
   }
 
   private async upsertProduct(storeAccountId: string, info: any) {
-    // Real API: statuses.status (not status.state), primary_image is array
     const ozonStatus = info.statuses?.status || info.status?.state || '';
     const isArchived = info.is_archived || false;
     const status = this.mapOzonStatus(ozonStatus, isArchived);
 
-    // primary_image can be string or array
     const primaryImg = Array.isArray(info.primary_image)
       ? info.primary_image[0]
       : info.primary_image || info.images?.[0] || null;
 
-    // stocks: { has_stock, stocks: [{present, reserved, sku, source}] }
     const stockItems: any[] = info.stocks?.stocks || [];
     const totalStock = stockItems.reduce((s: number, st: any) => s + (st.present || 0), 0);
 
-    // SKU from sources or top-level sku
     const primarySku = info.sku || info.sources?.[0]?.sku || 0;
+
+    // Look up category name from local DB
+    const descCatId = info.description_category_id || info.category_id || null;
+    let categoryName: string | null = null;
+    if (descCatId) {
+      const cat = await this.prisma.category.findUnique({ where: { id: descCatId } });
+      if (cat) {
+        categoryName = cat.nameZh ? `${cat.nameZh}` : cat.name;
+      }
+    }
 
     await this.prisma.product.upsert({
       where: {
@@ -292,6 +298,8 @@ export class ProductService {
         offerId: info.offer_id,
         name: info.name || '',
         barcode: info.barcodes?.[0] || null,
+        categoryId: descCatId,
+        categoryName,
         primaryImage: primaryImg,
         images: info.images || [],
         status,
@@ -315,6 +323,8 @@ export class ProductService {
       update: {
         name: info.name || '',
         barcode: info.barcodes?.[0] || null,
+        categoryId: descCatId,
+        categoryName,
         primaryImage: primaryImg,
         images: info.images || [],
         status,

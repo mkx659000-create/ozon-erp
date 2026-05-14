@@ -93,13 +93,13 @@ const editForm = ref({
 const exportLoading = ref(false);
 
 const statusTabs = computed(() => [
-  { key: 'ALL', label: '全部', count: statusCounts.value.total },
-  { key: 'ON_SALE', label: '在售', count: statusCounts.value.onSale, color: 'green' },
-  { key: 'OUT_OF_STOCK', label: '缺货', count: statusCounts.value.outOfStock, color: 'orange' },
-  { key: 'MODERATION', label: '审核中', count: statusCounts.value.moderation, color: 'blue' },
-  { key: 'MODERATION_FAILED', label: '审核失败', count: statusCounts.value.moderationFailed, color: 'red' },
-  { key: 'REMOVED', label: '已下架', count: statusCounts.value.removed, color: 'default' },
-  { key: 'ARCHIVED', label: '归档', count: statusCounts.value.archived, color: 'default' },
+  { key: 'ALL', label: '所有', count: statusCounts.value.total },
+  { key: 'ON_SALE', label: '销售中', count: statusCounts.value.onSale, color: 'green' },
+  { key: 'OUT_OF_STOCK', label: '准备销售', count: statusCounts.value.outOfStock, color: 'orange' },
+  { key: 'MODERATION_FAILED', label: '错误', count: statusCounts.value.moderationFailed, color: 'red' },
+  { key: 'MODERATION', label: '待修改', count: statusCounts.value.moderation, color: 'blue' },
+  { key: 'REMOVED', label: '商品已下架', count: statusCounts.value.removed, color: 'default' },
+  { key: 'ARCHIVED', label: '档案', count: statusCounts.value.archived, color: 'default' },
 ]);
 
 const columns = [
@@ -462,6 +462,7 @@ onMounted(() => {
           {{ tab.label }}
           <Badge
             :count="tab.count"
+            :overflowCount="99999"
             :numberStyle="{
               backgroundColor: tab.key === activeTab ? '#1890ff' : '#f0f0f0',
               color: tab.key === activeTab ? '#fff' : '#8c8c8c',

@@ -17,6 +17,7 @@ import { FinanceModule } from './modules/finance/finance.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { ReportModule } from './modules/report/report.module';
+import { RatingModule } from './modules/rating/rating.module';
 import { JobsModule } from './jobs/jobs.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -40,6 +41,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     WarehouseModule,
     ReturnsModule,
     ReportModule,
+    RatingModule,
     JobsModule,
   ],
   providers: [

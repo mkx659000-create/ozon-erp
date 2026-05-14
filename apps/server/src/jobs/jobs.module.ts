@@ -6,11 +6,13 @@ import { PromotionSyncProcessor, PROMOTION_SYNC_QUEUE } from './processors/promo
 import { StockSyncProcessor, STOCK_SYNC_QUEUE } from './processors/stock-sync.processor';
 import { FinanceSyncProcessor, FINANCE_SYNC_QUEUE } from './processors/finance-sync.processor';
 import { ReturnsSyncProcessor, RETURNS_SYNC_QUEUE } from './processors/returns-sync.processor';
+import { RatingSyncProcessor, RATING_SYNC_QUEUE } from './processors/rating-sync.processor';
 import { SyncSchedulerService } from './schedulers/sync-scheduler.service';
 import { SyncController } from './sync.controller';
 import { ProductModule } from '../modules/product/product.module';
 import { FinanceModule } from '../modules/finance/finance.module';
 import { ReturnsModule } from '../modules/returns/returns.module';
+import { RatingModule } from '../modules/rating/rating.module';
 
 @Module({
   imports: [
@@ -40,11 +42,13 @@ import { ReturnsModule } from '../modules/returns/returns.module';
       { name: STOCK_SYNC_QUEUE },
       { name: FINANCE_SYNC_QUEUE },
       { name: RETURNS_SYNC_QUEUE },
+      { name: RATING_SYNC_QUEUE },
     ),
 
     ProductModule,
     FinanceModule,
     ReturnsModule,
+    RatingModule,
   ],
   controllers: [SyncController],
   providers: [
@@ -53,6 +57,7 @@ import { ReturnsModule } from '../modules/returns/returns.module';
     StockSyncProcessor,
     FinanceSyncProcessor,
     ReturnsSyncProcessor,
+    RatingSyncProcessor,
     SyncSchedulerService,
   ],
   exports: [SyncSchedulerService, BullModule],

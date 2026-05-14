@@ -63,6 +63,7 @@ model StoreAccount {
   financeSummaries     FinanceSummary[]
   warehouses           Warehouse[]
   returns              Return[]
+  sellerRatings        SellerRating[]
 
   @@map("store_accounts")
 }
@@ -352,6 +353,7 @@ enum SyncType {
   FINANCE
   RETURNS
   WAREHOUSE
+  RATING
 }
 
 enum SyncLogStatus {
@@ -466,4 +468,25 @@ model Return {
   @@index([storeAccountId, status])
   @@index([storeAccountId, returnType])
   @@map("returns")
+}
+
+// ===================== SELLER RATING =====================
+
+model SellerRating {
+  id             String   @id @default(uuid())
+  storeAccountId String   @map("store_account_id")
+  ratingGroup    String   @map("rating_group")
+  ratingName     String   @map("rating_name")
+  currentValue   Decimal  @map("current_value") @db.Decimal(5, 2)
+  pastValue      Decimal  @map("past_value") @db.Decimal(5, 2)
+  ratingStatus   String   @map("rating_status")
+  penalty        Boolean  @default(false)
+  recordDate     DateTime @db.Date @map("record_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  storeAccount StoreAccount @relation(fields: [storeAccountId], references: [id])
+
+  @@unique([storeAccountId, ratingGroup, ratingName, recordDate])
+  @@index([storeAccountId, recordDate])
+  @@map("seller_ratings")
 }

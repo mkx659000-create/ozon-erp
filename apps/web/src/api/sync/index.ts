@@ -19,6 +19,7 @@ export interface SyncStatusResponse {
     promotion: any[];
     finance: any[];
     returns: any[];
+    rating: any[];
   };
   recentLogs: SyncLog[];
 }

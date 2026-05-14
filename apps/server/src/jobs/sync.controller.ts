@@ -47,6 +47,12 @@ export class SyncController {
     return { jobId: job.id, message: '财务同步任务已启动' };
   }
 
+  @Post('rating')
+  async triggerRatingSync(@Body() dto: TriggerSyncDto) {
+    const job = await this.syncScheduler.triggerRatingSync(dto.storeAccountId);
+    return { jobId: job.id, message: '评分同步任务已启动' };
+  }
+
   @Post('returns')
   async triggerReturnsSync(@Body() dto: TriggerSyncDto) {
     const job = await this.syncScheduler.triggerReturnsSync(dto.storeAccountId);

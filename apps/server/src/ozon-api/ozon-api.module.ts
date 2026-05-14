@@ -8,10 +8,11 @@ import { OzonFinanceApi } from './ozon-finance.api';
 import { OzonWarehouseApi } from './ozon-warehouse.api';
 import { OzonReturnsApi } from './ozon-returns.api';
 import { OzonReportApi } from './ozon-report.api';
+import { OzonRatingApi } from './ozon-rating.api';
 
 @Global()
 @Module({
-  providers: [OzonApiService, OzonProductApi, OzonPromotionApi, OzonCategoryApi, OzonOrderApi, OzonFinanceApi, OzonWarehouseApi, OzonReturnsApi, OzonReportApi],
-  exports: [OzonApiService, OzonProductApi, OzonPromotionApi, OzonCategoryApi, OzonOrderApi, OzonFinanceApi, OzonWarehouseApi, OzonReturnsApi, OzonReportApi],
+  providers: [OzonApiService, OzonProductApi, OzonPromotionApi, OzonCategoryApi, OzonOrderApi, OzonFinanceApi, OzonWarehouseApi, OzonReturnsApi, OzonReportApi, OzonRatingApi],
+  exports: [OzonApiService, OzonProductApi, OzonPromotionApi, OzonCategoryApi, OzonOrderApi, OzonFinanceApi, OzonWarehouseApi, OzonReturnsApi, OzonReportApi, OzonRatingApi],
 })
 export class OzonApiModule {}

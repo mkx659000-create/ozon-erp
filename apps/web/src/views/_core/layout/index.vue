@@ -26,6 +26,7 @@ import {
   ShopOutlined,
   FileTextOutlined,
   BarChartOutlined,
+  DollarOutlined,
   UserOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -64,6 +65,7 @@ const breadcrumbMap: Record<string, { parent?: string; title: string }> = {
   ProductPublish: { parent: 'OZON产品', title: '产品刊登' },
   PromotionActivities: { parent: 'OZON促销', title: '促销活动' },
   OrderList: { title: '订单管理' },
+  Finance: { title: '财务管理' },
   Analytics: { title: '数据分析' },
   StoreAccounts: { title: '店铺管理' },
 };
@@ -184,6 +186,10 @@ function handleLogout() {
         <MenuItem key="OrderList">
           <FileTextOutlined />
           <span>订单管理</span>
+        </MenuItem>
+        <MenuItem key="Finance">
+          <DollarOutlined />
+          <span>财务管理</span>
         </MenuItem>
         <MenuItem key="Analytics">
           <BarChartOutlined />

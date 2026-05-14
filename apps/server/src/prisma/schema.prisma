@@ -54,11 +54,13 @@ model StoreAccount {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  users      UserStoreAccount[]
-  products   Product[]
-  promotions Promotion[]
-  orders     Order[]
-  syncLogs   SyncLog[]
+  users                UserStoreAccount[]
+  products             Product[]
+  promotions           Promotion[]
+  orders               Order[]
+  syncLogs             SyncLog[]
+  financeTransactions  FinanceTransaction[]
+  financeSummaries     FinanceSummary[]
 
   @@map("store_accounts")
 }
@@ -344,6 +346,7 @@ enum SyncType {
   ORDER
   CATEGORY
   ANALYTICS
+  FINANCE
 }
 
 enum SyncLogStatus {
@@ -368,4 +371,49 @@ model OperationLog {
   @@index([userId, createdAt])
   @@index([targetType, targetId])
   @@map("operation_logs")
+}
+
+// ===================== FINANCE =====================
+
+model FinanceTransaction {
+  id               String   @id @default(uuid())
+  storeAccountId   String   @map("store_account_id")
+  operationId      BigInt   @map("operation_id")
+  operationType    String   @map("operation_type")
+  operationDate    DateTime @map("operation_date")
+  postingNumber    String?  @map("posting_number")
+  amount           Decimal  @db.Decimal(12, 2)
+  commissionAmount Decimal? @map("commission_amount") @db.Decimal(12, 2)
+  deliveryCharge   Decimal? @map("delivery_charge") @db.Decimal(12, 2)
+  accruals         Decimal? @db.Decimal(12, 2)
+  ozonSku          BigInt?  @map("ozon_sku")
+  productName      String?  @map("product_name")
+  rawData          Json?    @map("raw_data")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  storeAccount StoreAccount @relation(fields: [storeAccountId], references: [id])
+
+  @@unique([storeAccountId, operationId])
+  @@index([storeAccountId, operationDate])
+  @@index([storeAccountId, operationType])
+  @@map("finance_transactions")
+}
+
+model FinanceSummary {
+  id               String   @id @default(uuid())
+  storeAccountId   String   @map("store_account_id")
+  date             DateTime @db.Date
+  totalSales       Decimal  @default(0) @map("total_sales") @db.Decimal(14, 2)
+  totalCommissions Decimal  @default(0) @map("total_commissions") @db.Decimal(14, 2)
+  totalDelivery    Decimal  @default(0) @map("total_delivery") @db.Decimal(14, 2)
+  totalReturns     Decimal  @default(0) @map("total_returns") @db.Decimal(14, 2)
+  totalPayout      Decimal  @default(0) @map("total_payout") @db.Decimal(14, 2)
+  transactionCount Int      @default(0) @map("transaction_count")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  storeAccount StoreAccount @relation(fields: [storeAccountId], references: [id])
+
+  @@unique([storeAccountId, date])
+  @@map("finance_summaries")
 }

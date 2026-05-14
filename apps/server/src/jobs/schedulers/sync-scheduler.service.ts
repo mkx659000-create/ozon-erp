@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PRODUCT_SYNC_QUEUE } from '../processors/product-sync.processor';
 import { PROMOTION_SYNC_QUEUE } from '../processors/promotion-sync.processor';
 import { STOCK_SYNC_QUEUE } from '../processors/stock-sync.processor';
+import { FINANCE_SYNC_QUEUE } from '../processors/finance-sync.processor';
 
 @Injectable()
 export class SyncSchedulerService implements OnModuleInit {
@@ -14,6 +15,7 @@ export class SyncSchedulerService implements OnModuleInit {
     @InjectQueue(PRODUCT_SYNC_QUEUE) private productSyncQueue: Queue,
     @InjectQueue(PROMOTION_SYNC_QUEUE) private promotionSyncQueue: Queue,
     @InjectQueue(STOCK_SYNC_QUEUE) private stockSyncQueue: Queue,
+    @InjectQueue(FINANCE_SYNC_QUEUE) private financeSyncQueue: Queue,
     private prisma: PrismaService,
   ) {}
 
@@ -80,6 +82,19 @@ export class SyncSchedulerService implements OnModuleInit {
         },
       );
 
+      // Finance sync — every 2 hours
+      await this.financeSyncQueue.add(
+        `finance-sync-${store.id}`,
+        { storeAccountId: store.id },
+        {
+          ...jobOptions,
+          repeat: {
+            pattern: '0 */2 * * *', // every 2 hours at :00
+          },
+          jobId: `finance-sync-${store.id}`,
+        },
+      );
+
       this.logger.log(`Registered sync jobs for store "${store.storeName}" (${store.id})`);
     }
   }
@@ -126,14 +141,28 @@ export class SyncSchedulerService implements OnModuleInit {
     return job;
   }
 
+  async triggerFinanceSync(storeAccountId: string) {
+    const job = await this.financeSyncQueue.add(
+      `manual-finance-sync-${storeAccountId}`,
+      { storeAccountId },
+      {
+        removeOnComplete: { count: 10 },
+        removeOnFail: { count: 20 },
+      },
+    );
+    this.logger.log(`Triggered manual finance sync job ${job.id} for store ${storeAccountId}`);
+    return job;
+  }
+
   /**
    * Get sync job status for a store.
    */
   async getSyncStatus(storeAccountId: string) {
-    const [productJobs, stockJobs, promoJobs] = await Promise.all([
+    const [productJobs, stockJobs, promoJobs, financeJobs] = await Promise.all([
       this.productSyncQueue.getJobs(['active', 'waiting', 'delayed']),
       this.stockSyncQueue.getJobs(['active', 'waiting', 'delayed']),
       this.promotionSyncQueue.getJobs(['active', 'waiting', 'delayed']),
+      this.financeSyncQueue.getJobs(['active', 'waiting', 'delayed']),
     ]);
 
     const filter = (jobs: any[]) =>
@@ -150,6 +179,7 @@ export class SyncSchedulerService implements OnModuleInit {
       product: filter(productJobs),
       stock: filter(stockJobs),
       promotion: filter(promoJobs),
+      finance: filter(financeJobs),
     };
   }
 
@@ -157,7 +187,7 @@ export class SyncSchedulerService implements OnModuleInit {
    * Remove all repeatable jobs to allow re-registration.
    */
   private async cleanRepeatableJobs() {
-    const queues = [this.productSyncQueue, this.promotionSyncQueue, this.stockSyncQueue];
+    const queues = [this.productSyncQueue, this.promotionSyncQueue, this.stockSyncQueue, this.financeSyncQueue];
     for (const queue of queues) {
       const repeatables = await queue.getRepeatableJobs();
       for (const r of repeatables) {

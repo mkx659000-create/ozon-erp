@@ -35,13 +35,16 @@ export class SyncController {
     return { jobId: job.id, message: '促销同步任务已启动' };
   }
 
-  /**
-   * POST /sync/stock — trigger manual stock sync.
-   */
   @Post('stock')
   async triggerStockSync(@Body() dto: TriggerSyncDto) {
     const job = await this.syncScheduler.triggerStockSync(dto.storeAccountId);
     return { jobId: job.id, message: '库存同步任务已启动' };
+  }
+
+  @Post('finance')
+  async triggerFinanceSync(@Body() dto: TriggerSyncDto) {
+    const job = await this.syncScheduler.triggerFinanceSync(dto.storeAccountId);
+    return { jobId: job.id, message: '财务同步任务已启动' };
   }
 
   /**

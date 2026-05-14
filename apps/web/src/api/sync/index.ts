@@ -17,6 +17,7 @@ export interface SyncStatusResponse {
     product: any[];
     stock: any[];
     promotion: any[];
+    finance: any[];
   };
   recentLogs: SyncLog[];
 }
@@ -46,6 +47,13 @@ export function triggerStockSyncApi(storeAccountId: string) {
 export function getSyncStatusApi(storeAccountId: string) {
   return request.get<any, SyncStatusResponse>('/sync/status', {
     params: { storeAccountId },
+  });
+}
+
+/** Trigger manual finance sync */
+export function triggerFinanceSyncApi(storeAccountId: string) {
+  return request.post<any, { jobId: string; message: string }>('/sync/finance', {
+    storeAccountId,
   });
 }
 

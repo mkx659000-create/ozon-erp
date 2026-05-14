@@ -4,9 +4,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ProductSyncProcessor, PRODUCT_SYNC_QUEUE } from './processors/product-sync.processor';
 import { PromotionSyncProcessor, PROMOTION_SYNC_QUEUE } from './processors/promotion-sync.processor';
 import { StockSyncProcessor, STOCK_SYNC_QUEUE } from './processors/stock-sync.processor';
+import { FinanceSyncProcessor, FINANCE_SYNC_QUEUE } from './processors/finance-sync.processor';
 import { SyncSchedulerService } from './schedulers/sync-scheduler.service';
 import { SyncController } from './sync.controller';
 import { ProductModule } from '../modules/product/product.module';
+import { FinanceModule } from '../modules/finance/finance.module';
 
 @Module({
   imports: [
@@ -34,16 +36,18 @@ import { ProductModule } from '../modules/product/product.module';
       { name: PRODUCT_SYNC_QUEUE },
       { name: PROMOTION_SYNC_QUEUE },
       { name: STOCK_SYNC_QUEUE },
+      { name: FINANCE_SYNC_QUEUE },
     ),
 
-    // Import ProductModule so ProductSyncProcessor can use ProductService
     ProductModule,
+    FinanceModule,
   ],
   controllers: [SyncController],
   providers: [
     ProductSyncProcessor,
     PromotionSyncProcessor,
     StockSyncProcessor,
+    FinanceSyncProcessor,
     SyncSchedulerService,
   ],
   exports: [SyncSchedulerService, BullModule],

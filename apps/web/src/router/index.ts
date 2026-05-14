@@ -48,6 +48,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/order/index.vue'),
         meta: { title: '订单管理' },
       },
+      // Finance
+      {
+        path: 'finance',
+        name: 'Finance',
+        component: () => import('@/views/finance/index.vue'),
+        meta: { title: '财务管理' },
+      },
       // Analytics
       {
         path: 'analytics',

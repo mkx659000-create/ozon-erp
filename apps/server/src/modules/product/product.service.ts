@@ -193,6 +193,52 @@ export class ProductService {
     return { total, onSale, outOfStock, moderation, moderationFailed, removed, archived };
   }
 
+  async archiveProducts(storeAccountId: string, productIds: string[]) {
+    const store = await this.prisma.storeAccount.findUniqueOrThrow({
+      where: { id: storeAccountId },
+    });
+    const credentials = { clientId: store.ozonClientId, apiKey: store.ozonApiKey };
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, storeAccountId },
+      select: { ozonProductId: true },
+    });
+    const ozonIds = products.map((p) => Number(p.ozonProductId));
+    if (ozonIds.length === 0) return { archived: 0 };
+
+    await this.ozonProductApi.archiveProducts(credentials, ozonIds);
+
+    await this.prisma.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { status: 'ARCHIVED', visible: false },
+    });
+
+    return { archived: ozonIds.length };
+  }
+
+  async unarchiveProducts(storeAccountId: string, productIds: string[]) {
+    const store = await this.prisma.storeAccount.findUniqueOrThrow({
+      where: { id: storeAccountId },
+    });
+    const credentials = { clientId: store.ozonClientId, apiKey: store.ozonApiKey };
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, storeAccountId },
+      select: { ozonProductId: true },
+    });
+    const ozonIds = products.map((p) => Number(p.ozonProductId));
+    if (ozonIds.length === 0) return { unarchived: 0 };
+
+    await this.ozonProductApi.unarchiveProducts(credentials, ozonIds);
+
+    await this.prisma.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { status: 'ON_SALE', visible: true },
+    });
+
+    return { unarchived: ozonIds.length };
+  }
+
   async diagnosticCounts(storeAccountId: string) {
     const store = await this.prisma.storeAccount.findUnique({
       where: { id: storeAccountId },

@@ -279,8 +279,10 @@ async function handleBatchEditSave() {
 async function handleBatchArchive() {
   if (selectedRowKeys.value.length === 0) return;
   try {
-    const res = await archiveProductsApi(selectedRowKeys.value);
-    message.success(`成功归档 ${res.updated} 个商品`);
+    const storeId = storeAccountStore.activeStoreId;
+    if (!storeId) return;
+    const res = await archiveProductsApi(storeId, selectedRowKeys.value);
+    message.success(`成功归档 ${res.archived} 个商品`);
     selectedRowKeys.value = [];
     await Promise.all([fetchProducts(), fetchStatusCounts()]);
   } catch {

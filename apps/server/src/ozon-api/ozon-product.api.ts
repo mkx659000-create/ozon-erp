@@ -168,6 +168,34 @@ export class OzonProductApi {
   }
 
   /**
+   * Archive products by product_id.
+   */
+  async archiveProducts(
+    credentials: OzonCredentials,
+    productIds: number[],
+  ): Promise<boolean> {
+    const client = this.ozonApiService.createClient(credentials);
+    const { data } = await client.post('/v1/product/archive', {
+      product_id: productIds,
+    });
+    return data.result;
+  }
+
+  /**
+   * Unarchive products by product_id.
+   */
+  async unarchiveProducts(
+    credentials: OzonCredentials,
+    productIds: number[],
+  ): Promise<boolean> {
+    const client = this.ozonApiService.createClient(credentials);
+    const { data } = await client.post('/v1/product/unarchive', {
+      product_id: productIds,
+    });
+    return data.result;
+  }
+
+  /**
    * Get stock info with cursor pagination.
    * Real API: items/total/cursor at top level, uses cursor (not last_id).
    */

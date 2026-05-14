@@ -65,6 +65,16 @@ export class ProductController {
     return this.productService.batchUpdate(dto);
   }
 
+  @Post('archive')
+  archive(@Body() body: { storeAccountId: string; productIds: string[] }) {
+    return this.productService.archiveProducts(body.storeAccountId, body.productIds);
+  }
+
+  @Post('unarchive')
+  unarchive(@Body() body: { storeAccountId: string; productIds: string[] }) {
+    return this.productService.unarchiveProducts(body.storeAccountId, body.productIds);
+  }
+
   @Post('sync')
   async sync(@Body() dto: SyncProductDto) {
     try {

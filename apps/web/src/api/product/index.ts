@@ -102,9 +102,10 @@ export function exportProductsApi(params: {
   return request.get('/products/export', { params });
 }
 
-export function archiveProductsApi(productIds: string[]): Promise<{ updated: number }> {
-  return request.post('/products/batch-update', {
-    productIds,
-    updates: { status: 'ARCHIVED', visible: false },
-  });
+export function archiveProductsApi(storeAccountId: string, productIds: string[]): Promise<{ archived: number }> {
+  return request.post('/products/archive', { storeAccountId, productIds });
+}
+
+export function unarchiveProductsApi(storeAccountId: string, productIds: string[]): Promise<{ unarchived: number }> {
+  return request.post('/products/unarchive', { storeAccountId, productIds });
 }

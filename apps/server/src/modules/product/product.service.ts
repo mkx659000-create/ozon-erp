@@ -354,8 +354,8 @@ export class ProductService {
         skus: primarySku ? {
           create: [{
             ozonSku: BigInt(primarySku),
-            stock: stockItems.find((s: any) => s.sku === primarySku)?.present || 0,
-            reserved: stockItems.find((s: any) => s.sku === primarySku)?.reserved || 0,
+            stock: totalStock,
+            reserved: (info.stocks && typeof info.stocks.reserved === 'number') ? info.stocks.reserved : 0,
           }],
         } : undefined,
       },

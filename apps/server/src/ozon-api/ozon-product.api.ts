@@ -27,6 +27,7 @@ export class OzonProductApi {
    */
   async listAllProducts(
     credentials: OzonCredentials,
+    visibility?: string,
   ): Promise<Array<{ product_id: number; offer_id: string }>> {
     const client = this.ozonApiService.createClient(credentials);
     const allItems: Array<{ product_id: number; offer_id: string }> = [];
@@ -34,8 +35,11 @@ export class OzonProductApi {
     const limit = 1000;
 
     while (true) {
+      const filter: any = {};
+      if (visibility) filter.visibility = visibility;
+
       const body: OzonProductListRequest = {
-        filter: {},
+        filter,
         limit,
         ...(lastId ? { last_id: lastId } : {}),
       };
@@ -49,7 +53,7 @@ export class OzonProductApi {
       lastId = data.result.last_id;
 
       this.logger.debug(
-        `Fetched ${allItems.length}/${data.result.total} product IDs`,
+        `Fetched ${allItems.length}/${data.result.total} product IDs (visibility=${visibility || 'default'})`,
       );
 
       if (
@@ -61,6 +65,31 @@ export class OzonProductApi {
     }
 
     return allItems;
+  }
+
+  /**
+   * Get product counts by visibility filter (for diagnostic comparison with Ozon dashboard).
+   */
+  async getVisibilityCounts(
+    credentials: OzonCredentials,
+  ): Promise<Record<string, number>> {
+    const client = this.ozonApiService.createClient(credentials);
+    const filters = ['ALL', 'VISIBLE', 'INVISIBLE', 'EMPTY_STOCK', 'NOT_MODERATED', 'MODERATED', 'DISABLED', 'STATE_FAILED', 'READY_TO_SUPPLY'];
+    const counts: Record<string, number> = {};
+
+    for (const vis of filters) {
+      try {
+        const { data } = await client.post<OzonProductListResponse>(
+          '/v3/product/list',
+          { filter: { visibility: vis }, limit: 1 },
+        );
+        counts[vis] = data.result.total;
+      } catch {
+        counts[vis] = -1;
+      }
+    }
+
+    return counts;
   }
 
   /**

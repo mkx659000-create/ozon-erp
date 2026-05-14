@@ -169,6 +169,19 @@ export class ProductService {
     return { total, onSale, outOfStock, moderation, moderationFailed, removed, archived };
   }
 
+  async diagnosticCounts(storeAccountId: string) {
+    const store = await this.prisma.storeAccount.findUnique({
+      where: { id: storeAccountId },
+    });
+    if (!store) throw new NotFoundException('店铺不存在');
+
+    const credentials = { clientId: store.ozonClientId, apiKey: store.ozonApiKey };
+    const ozonCounts = await this.ozonProductApi.getVisibilityCounts(credentials);
+    const localCounts = await this.getStatusCounts(storeAccountId);
+
+    return { ozon: ozonCounts, local: localCounts };
+  }
+
   /**
    * Sync products from Ozon API to local database.
    */
@@ -194,10 +207,10 @@ export class ProductService {
     let failed = 0;
 
     try {
-      // Step 1: Get all product IDs
+      // Step 1: Get all product IDs using ALL visibility to include every product
       this.logger.log(`Starting product sync for store ${store.storeName}`);
-      const productList = await this.ozonProductApi.listAllProducts(credentials);
-      this.logger.log(`Found ${productList.length} products on Ozon`);
+      const productList = await this.ozonProductApi.listAllProducts(credentials, 'ALL');
+      this.logger.log(`Found ${productList.length} products on Ozon (visibility=ALL)`);
 
       // Step 2: Get detailed info in batches
       const productIds = productList.map((p) => p.product_id);
@@ -206,16 +219,25 @@ export class ProductService {
         productIds,
       );
 
-      // Log first product's structure for debugging status mapping
+      // Step 2.5: Get accurate stock info from /v4/product/info/stocks
+      const stockInfos = await this.ozonProductApi.getStockInfo(credentials);
+      const stockMap = new Map<number, number>();
+      for (const item of stockInfos) {
+        const total = item.stocks.reduce((s, st) => s + (st.present || 0), 0);
+        stockMap.set(item.product_id, total);
+      }
+      this.logger.log(`Fetched stock info for ${stockInfos.length} products`);
+
+      // Log sample data for debugging
       if (productInfos.length > 0) {
         const sample = productInfos[0];
-        this.logger.log(`Sample product status fields: state=${sample.status?.state}, stocks=${JSON.stringify(sample.stocks)}, is_archived=${(sample as any).is_archived}`);
+        this.logger.log(`Sample product: id=${sample.id}, state=${sample.status?.state}, visible=${sample.visible}, stocks=${JSON.stringify(sample.stocks)}, stockFromV4=${stockMap.get(sample.id)}`);
       }
 
       // Step 3: Upsert into local database
       for (const info of productInfos) {
         try {
-          await this.upsertProduct(storeAccountId, info);
+          await this.upsertProduct(storeAccountId, info, stockMap);
           synced++;
         } catch (error: any) {
           this.logger.error(
@@ -242,8 +264,10 @@ export class ProductService {
         data: { lastSyncAt: new Date() },
       });
 
+      // Log status breakdown after sync
+      const counts = await this.getStatusCounts(storeAccountId);
       this.logger.log(
-        `Product sync complete: ${synced} synced, ${failed} failed`,
+        `Product sync complete: ${synced} synced, ${failed} failed. Status breakdown: total=${counts.total}, onSale=${counts.onSale}, outOfStock=${counts.outOfStock}, moderation=${counts.moderation}, moderationFailed=${counts.moderationFailed}, removed=${counts.removed}, archived=${counts.archived}`,
       );
     } catch (error: any) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
@@ -267,17 +291,18 @@ export class ProductService {
     return { synced, failed };
   }
 
-  private async upsertProduct(storeAccountId: string, info: any) {
+  private async upsertProduct(storeAccountId: string, info: any, stockMap?: Map<number, number>) {
     const ozonStatus = info.status?.state || info.state || '';
     const isArchived = info.is_archived || false;
+    const isFailed = info.status?.is_failed || false;
 
     const primaryImg = Array.isArray(info.primary_image)
       ? info.primary_image[0]
       : info.primary_image || info.images?.[0] || null;
 
-    // Handle both stock formats: flat {present,coming,reserved} or nested {stocks:[...]}
-    let totalStock = 0;
-    if (info.stocks) {
+    // Prefer accurate stock from /v4/product/info/stocks, fall back to product info
+    let totalStock = stockMap?.get(info.id) ?? 0;
+    if (!stockMap?.has(info.id) && info.stocks) {
       if (Array.isArray(info.stocks.stocks)) {
         totalStock = info.stocks.stocks.reduce((s: number, st: any) => s + (st.present || 0), 0);
       } else if (typeof info.stocks.present === 'number') {
@@ -285,7 +310,7 @@ export class ProductService {
       }
     }
 
-    const status = this.mapOzonStatus(ozonStatus, isArchived, totalStock);
+    const status = this.mapOzonStatus(ozonStatus, isArchived, totalStock, isFailed);
 
     const primarySku = info.sku || info.sources?.[0]?.sku || 0;
 
@@ -354,16 +379,19 @@ export class ProductService {
     });
   }
 
-  private mapOzonStatus(ozonStatus: string, isArchived: boolean, totalStock: number): ProductStatus {
+  private mapOzonStatus(ozonStatus: string, isArchived: boolean, totalStock: number, isFailed: boolean = false): ProductStatus {
     if (isArchived) return ProductStatus.ARCHIVED;
+    if (isFailed) return ProductStatus.MODERATION_FAILED;
     switch (ozonStatus) {
       case 'price_sent':
       case 'processed':
         return totalStock === 0 ? ProductStatus.OUT_OF_STOCK : ProductStatus.ON_SALE;
       case 'moderating':
+      case 'processing':
         return ProductStatus.MODERATION;
       case 'failed_moderation':
       case 'failed_validation':
+      case 'failed':
         return ProductStatus.MODERATION_FAILED;
       case 'disabled':
       case 'removed':

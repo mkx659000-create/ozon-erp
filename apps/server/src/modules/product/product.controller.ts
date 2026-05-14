@@ -31,6 +31,11 @@ export class ProductController {
     return this.productService.getStatusCounts(storeAccountId);
   }
 
+  @Get('diagnostic-counts')
+  diagnosticCounts(@Query('storeAccountId') storeAccountId: string) {
+    return this.productService.diagnosticCounts(storeAccountId);
+  }
+
   @Get('export')
   async exportProducts(
     @Query('storeAccountId') storeAccountId?: string,

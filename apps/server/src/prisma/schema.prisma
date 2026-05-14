@@ -127,6 +127,8 @@ model Product {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   storeAccount      StoreAccount       @relation(fields: [storeAccountId], references: [id])
+  ozonFlags String[] @default([]) @map("ozon_flags")
+
   skus              ProductSku[]
   promotionProducts PromotionProduct[]
   priceRules        PriceAutoRule[]

@@ -23,7 +23,22 @@ export class ProductService {
     const where: Prisma.ProductWhereInput = {};
 
     if (storeAccountId) where.storeAccountId = storeAccountId;
-    if (status) where.status = status;
+    if (status) {
+      const flagMap: Record<string, string> = {
+        OUT_OF_STOCK: 'EMPTY_STOCK',
+        MODERATION_FAILED: 'STATE_FAILED',
+        MODERATION: 'NOT_MODERATED',
+        REMOVED: 'DISABLED',
+      };
+      if (status === ProductStatus.ON_SALE) {
+        where.ozonFlags = { isEmpty: true };
+        where.status = { not: ProductStatus.ARCHIVED };
+      } else if (flagMap[status]) {
+        where.ozonFlags = { has: flagMap[status] };
+      } else {
+        where.status = status;
+      }
+    }
     if (visible !== undefined) where.visible = visible;
     if (offerId) where.offerId = { contains: offerId, mode: 'insensitive' };
     if (keyword) {
@@ -156,15 +171,24 @@ export class ProductService {
     const where: Prisma.ProductWhereInput = {};
     if (storeAccountId) where.storeAccountId = storeAccountId;
 
-    const [total, onSale, outOfStock, moderation, moderationFailed, removed, archived] = await Promise.all([
+    // Count by ozonFlags (independent, overlapping counts — matches Ozon dashboard)
+    const [total, outOfStock, moderationFailed, moderation, removed, archived] = await Promise.all([
       this.prisma.product.count({ where }),
-      this.prisma.product.count({ where: { ...where, status: ProductStatus.ON_SALE } }),
-      this.prisma.product.count({ where: { ...where, status: ProductStatus.OUT_OF_STOCK } }),
-      this.prisma.product.count({ where: { ...where, status: ProductStatus.MODERATION } }),
-      this.prisma.product.count({ where: { ...where, status: ProductStatus.MODERATION_FAILED } }),
-      this.prisma.product.count({ where: { ...where, status: ProductStatus.REMOVED } }),
+      this.prisma.product.count({ where: { ...where, ozonFlags: { has: 'EMPTY_STOCK' } } }),
+      this.prisma.product.count({ where: { ...where, ozonFlags: { has: 'STATE_FAILED' } } }),
+      this.prisma.product.count({ where: { ...where, ozonFlags: { has: 'NOT_MODERATED' } } }),
+      this.prisma.product.count({ where: { ...where, ozonFlags: { has: 'DISABLED' } } }),
       this.prisma.product.count({ where: { ...where, status: ProductStatus.ARCHIVED } }),
     ]);
+
+    // onSale = products with no problem flags (VISIBLE in Ozon terms)
+    const onSale = await this.prisma.product.count({
+      where: {
+        ...where,
+        ozonFlags: { isEmpty: true },
+        status: { not: ProductStatus.ARCHIVED },
+      },
+    });
 
     return { total, onSale, outOfStock, moderation, moderationFailed, removed, archived };
   }
@@ -236,19 +260,17 @@ export class ProductService {
       const productList = await this.ozonProductApi.listAllProducts(credentials, 'ALL');
       this.logger.log(`Found ${productList.length} products on Ozon`);
 
-      // Step 2: Build visibility map by querying each category
-      const visibilityMap = new Map<number, ProductStatus>();
-      // Order matters: last wins. Lowest priority first, highest last.
-      const visCategories: Array<{ vis: string; status: ProductStatus }> = [
-        { vis: 'EMPTY_STOCK', status: ProductStatus.OUT_OF_STOCK },
-        { vis: 'DISABLED', status: ProductStatus.REMOVED },
-        { vis: 'NOT_MODERATED', status: ProductStatus.MODERATION },
-        { vis: 'STATE_FAILED', status: ProductStatus.MODERATION_FAILED },
-      ];
-      for (const { vis, status } of visCategories) {
+      // Step 2: Build flags map by querying each visibility category
+      const flagsMap = new Map<number, string[]>();
+      const visCategories = ['EMPTY_STOCK', 'DISABLED', 'NOT_MODERATED', 'STATE_FAILED'];
+      for (const vis of visCategories) {
         try {
           const ids = await this.ozonProductApi.listAllProducts(credentials, vis);
-          for (const p of ids) visibilityMap.set(p.product_id, status);
+          for (const p of ids) {
+            const existing = flagsMap.get(p.product_id) || [];
+            existing.push(vis);
+            flagsMap.set(p.product_id, existing);
+          }
           this.logger.log(`  ${vis}: ${ids.length} products`);
         } catch { /* skip */ }
       }
@@ -272,7 +294,7 @@ export class ProductService {
       // Step 5: Upsert into local database
       for (const info of productInfos) {
         try {
-          await this.upsertProduct(storeAccountId, info, stockMap, visibilityMap);
+          await this.upsertProduct(storeAccountId, info, stockMap, flagsMap);
           synced++;
         } catch (error: any) {
           this.logger.error(
@@ -326,12 +348,11 @@ export class ProductService {
     return { synced, failed };
   }
 
-  private async upsertProduct(storeAccountId: string, info: any, stockMap?: Map<number, number>, visibilityMap?: Map<number, ProductStatus>) {
+  private async upsertProduct(storeAccountId: string, info: any, stockMap?: Map<number, number>, flagsMap?: Map<number, string[]>) {
     const primaryImg = Array.isArray(info.primary_image)
       ? info.primary_image[0]
       : info.primary_image || info.images?.[0] || null;
 
-    // Prefer accurate stock from /v4/product/info/stocks, fall back to product info
     let totalStock = stockMap?.get(info.id) ?? 0;
     if (!stockMap?.has(info.id) && info.stocks) {
       if (Array.isArray(info.stocks.stocks)) {
@@ -341,10 +362,16 @@ export class ProductService {
       }
     }
 
-    // Use Ozon visibility-based status (most accurate), with priority:
-    // STATE_FAILED > NOT_MODERATED > DISABLED > EMPTY_STOCK > ON_SALE
-    const status = visibilityMap?.get(info.id) || ProductStatus.ON_SALE;
+    const ozonFlags = flagsMap?.get(info.id) || [];
     const isArchived = info.is_archived || false;
+
+    // Primary status: highest priority flag wins (for single-status filtering)
+    let status: ProductStatus = ProductStatus.ON_SALE;
+    if (isArchived) status = ProductStatus.ARCHIVED;
+    else if (ozonFlags.includes('STATE_FAILED')) status = ProductStatus.MODERATION_FAILED;
+    else if (ozonFlags.includes('NOT_MODERATED')) status = ProductStatus.MODERATION;
+    else if (ozonFlags.includes('DISABLED')) status = ProductStatus.REMOVED;
+    else if (ozonFlags.includes('EMPTY_STOCK')) status = ProductStatus.OUT_OF_STOCK;
 
     const primarySku = info.sku || info.sources?.[0]?.sku || 0;
 
@@ -376,6 +403,7 @@ export class ProductService {
         primaryImage: primaryImg,
         images: info.images || [],
         status,
+        ozonFlags,
         visible: !isArchived,
         sellingPrice: info.price ? parseFloat(info.price) : null,
         originalPrice: info.old_price ? parseFloat(info.old_price) : null,
@@ -401,6 +429,7 @@ export class ProductService {
         primaryImage: primaryImg,
         images: info.images || [],
         status,
+        ozonFlags,
         visible: !isArchived,
         sellingPrice: info.price ? parseFloat(info.price) : null,
         originalPrice: info.old_price ? parseFloat(info.old_price) : null,

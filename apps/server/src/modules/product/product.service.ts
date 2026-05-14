@@ -238,11 +238,12 @@ export class ProductService {
 
       // Step 2: Build visibility map by querying each category
       const visibilityMap = new Map<number, ProductStatus>();
+      // Order matters: last wins. Lowest priority first, highest last.
       const visCategories: Array<{ vis: string; status: ProductStatus }> = [
-        { vis: 'STATE_FAILED', status: ProductStatus.MODERATION_FAILED },
-        { vis: 'NOT_MODERATED', status: ProductStatus.MODERATION },
-        { vis: 'DISABLED', status: ProductStatus.REMOVED },
         { vis: 'EMPTY_STOCK', status: ProductStatus.OUT_OF_STOCK },
+        { vis: 'DISABLED', status: ProductStatus.REMOVED },
+        { vis: 'NOT_MODERATED', status: ProductStatus.MODERATION },
+        { vis: 'STATE_FAILED', status: ProductStatus.MODERATION_FAILED },
       ];
       for (const { vis, status } of visCategories) {
         try {

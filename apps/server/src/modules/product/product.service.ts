@@ -206,6 +206,12 @@ export class ProductService {
         productIds,
       );
 
+      // Log first product's structure for debugging status mapping
+      if (productInfos.length > 0) {
+        const sample = productInfos[0];
+        this.logger.log(`Sample product status fields: state=${sample.status?.state}, stocks=${JSON.stringify(sample.stocks)}, is_archived=${(sample as any).is_archived}`);
+      }
+
       // Step 3: Upsert into local database
       for (const info of productInfos) {
         try {
@@ -262,16 +268,24 @@ export class ProductService {
   }
 
   private async upsertProduct(storeAccountId: string, info: any) {
-    const ozonStatus = info.statuses?.status || info.status?.state || '';
+    const ozonStatus = info.status?.state || info.state || '';
     const isArchived = info.is_archived || false;
-    const status = this.mapOzonStatus(ozonStatus, isArchived);
 
     const primaryImg = Array.isArray(info.primary_image)
       ? info.primary_image[0]
       : info.primary_image || info.images?.[0] || null;
 
-    const stockItems: any[] = info.stocks?.stocks || [];
-    const totalStock = stockItems.reduce((s: number, st: any) => s + (st.present || 0), 0);
+    // Handle both stock formats: flat {present,coming,reserved} or nested {stocks:[...]}
+    let totalStock = 0;
+    if (info.stocks) {
+      if (Array.isArray(info.stocks.stocks)) {
+        totalStock = info.stocks.stocks.reduce((s: number, st: any) => s + (st.present || 0), 0);
+      } else if (typeof info.stocks.present === 'number') {
+        totalStock = info.stocks.present;
+      }
+    }
+
+    const status = this.mapOzonStatus(ozonStatus, isArchived, totalStock);
 
     const primarySku = info.sku || info.sources?.[0]?.sku || 0;
 
@@ -340,12 +354,12 @@ export class ProductService {
     });
   }
 
-  private mapOzonStatus(ozonStatus: string, isArchived: boolean): ProductStatus {
+  private mapOzonStatus(ozonStatus: string, isArchived: boolean, totalStock: number): ProductStatus {
     if (isArchived) return ProductStatus.ARCHIVED;
     switch (ozonStatus) {
       case 'price_sent':
       case 'processed':
-        return ProductStatus.ON_SALE;
+        return totalStock === 0 ? ProductStatus.OUT_OF_STOCK : ProductStatus.ON_SALE;
       case 'moderating':
         return ProductStatus.MODERATION;
       case 'failed_moderation':
@@ -357,7 +371,7 @@ export class ProductService {
       case 'archived':
         return ProductStatus.ARCHIVED;
       default:
-        return ProductStatus.ON_SALE;
+        return totalStock === 0 ? ProductStatus.OUT_OF_STOCK : ProductStatus.ON_SALE;
     }
   }
 }

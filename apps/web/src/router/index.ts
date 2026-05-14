@@ -69,6 +69,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/returns/index.vue'),
         meta: { title: '退货管理' },
       },
+      // Pricing
+      {
+        path: 'pricing',
+        name: 'Pricing',
+        component: () => import('@/views/pricing/index.vue'),
+        meta: { title: '定价管理' },
+      },
       // Rating
       {
         path: 'rating',

@@ -31,6 +31,7 @@ import {
   RollbackOutlined,
   FileSearchOutlined,
   StarOutlined,
+  MoneyCollectOutlined,
   UserOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -72,6 +73,7 @@ const breadcrumbMap: Record<string, { parent?: string; title: string }> = {
   Finance: { title: '财务管理' },
   Warehouse: { title: '仓库管理' },
   Returns: { title: '退货管理' },
+  Pricing: { title: '定价管理' },
   Rating: { title: '卖家评分' },
   Reports: { title: '报告中心' },
   Analytics: { title: '数据分析' },
@@ -206,6 +208,10 @@ function handleLogout() {
         <MenuItem key="Returns">
           <RollbackOutlined />
           <span>退货管理</span>
+        </MenuItem>
+        <MenuItem key="Pricing">
+          <MoneyCollectOutlined />
+          <span>定价管理</span>
         </MenuItem>
         <MenuItem key="Rating">
           <StarOutlined />

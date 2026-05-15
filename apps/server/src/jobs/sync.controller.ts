@@ -53,6 +53,12 @@ export class SyncController {
     return { jobId: job.id, message: '评分同步任务已启动' };
   }
 
+  @Post('order')
+  async triggerOrderSync(@Body() dto: TriggerSyncDto) {
+    const job = await this.syncScheduler.triggerOrderSync(dto.storeAccountId);
+    return { jobId: job.id, message: '订单同步任务已启动' };
+  }
+
   @Post('returns')
   async triggerReturnsSync(@Body() dto: TriggerSyncDto) {
     const job = await this.syncScheduler.triggerReturnsSync(dto.storeAccountId);
@@ -68,6 +74,7 @@ export class SyncController {
       this.syncScheduler.triggerFinanceSync(dto.storeAccountId),
       this.syncScheduler.triggerReturnsSync(dto.storeAccountId),
       this.syncScheduler.triggerRatingSync(dto.storeAccountId),
+      this.syncScheduler.triggerOrderSync(dto.storeAccountId),
     ]);
     return {
       jobIds: jobs.map((j) => j.id),

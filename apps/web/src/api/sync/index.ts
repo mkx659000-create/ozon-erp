@@ -20,6 +20,7 @@ export interface SyncStatusResponse {
     finance: any[];
     returns: any[];
     rating: any[];
+    order: any[];
   };
   recentLogs: SyncLog[];
 }

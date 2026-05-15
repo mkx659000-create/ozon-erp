@@ -4,6 +4,8 @@ export interface DashboardOverview {
   products: { total: number; onSale: number };
   promotions: { total: number; joined: number };
   orders: { total: number; pending: number };
+  returns: { total: number };
+  warehouses: { total: number };
   lastSync: {
     syncType: string;
     status: string;

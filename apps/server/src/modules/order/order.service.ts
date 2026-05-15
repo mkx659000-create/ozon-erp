@@ -18,13 +18,14 @@ export class OrderService {
    * List orders with filters + pagination.
    */
   async findAll(query: QueryOrderDto) {
-    const { page, pageSize, storeAccountId, status, keyword, dateFrom, dateTo } = query;
+    const { page, pageSize, storeAccountId, status, keyword, dateFrom, dateTo, orderType } = query;
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.OrderWhereInput = {};
 
     if (storeAccountId) where.storeAccountId = storeAccountId;
     if (status) where.orderStatus = status as OrderStatus;
+    if (orderType) where.orderType = orderType;
     if (keyword) {
       where.OR = [
         { ozonPostingNumber: { contains: keyword, mode: 'insensitive' } },
@@ -130,71 +131,36 @@ export class OrderService {
     let failed = 0;
 
     try {
-      const postings = await this.ozonOrderApi.listAllFbsPostingsSince(credentials, since, to);
-      this.logger.log(`Found ${postings.length} postings from ${since} to ${to}`);
+      // Sync FBS orders
+      const fbsPostings = await this.ozonOrderApi.listAllFbsPostingsSince(credentials, since, to);
+      this.logger.log(`Found ${fbsPostings.length} FBS postings from ${since} to ${to}`);
 
-      for (const posting of postings) {
+      for (const posting of fbsPostings) {
         try {
-          const totalAmount = posting.products.reduce(
-            (sum, p) => sum + parseFloat(p.price) * p.quantity,
-            0,
-          );
-
-          const statusMap: Record<string, OrderStatus> = {
-            awaiting_packaging: OrderStatus.AWAITING_PACKAGING,
-            awaiting_deliver: OrderStatus.AWAITING_DELIVER,
-            delivering: OrderStatus.DELIVERING,
-            delivered: OrderStatus.DELIVERED,
-            cancelled: OrderStatus.CANCELLED,
-            returned: OrderStatus.RETURNED,
-          };
-          const mappedStatus = statusMap[posting.status] || OrderStatus.AWAITING_PACKAGING;
-
-          const order = await this.prisma.order.upsert({
-            where: {
-              storeAccountId_ozonPostingNumber: {
-                storeAccountId,
-                ozonPostingNumber: posting.posting_number,
-              },
-            },
-            create: {
-              storeAccountId,
-              ozonPostingNumber: posting.posting_number,
-              orderStatus: mappedStatus,
-              totalAmount,
-              trackingNumber: posting.tracking_number || null,
-              ozonCreatedAt: new Date(posting.created_at),
-            },
-            update: {
-              orderStatus: mappedStatus,
-              totalAmount,
-              trackingNumber: posting.tracking_number || null,
-            },
-          });
-
-          // Sync order items — delete existing and recreate
-          await this.prisma.orderItem.deleteMany({
-            where: { orderId: order.id },
-          });
-
-          for (const product of posting.products) {
-            await this.prisma.orderItem.create({
-              data: {
-                orderId: order.id,
-                ozonSku: BigInt(product.sku),
-                name: product.name,
-                quantity: product.quantity,
-                price: parseFloat(product.price),
-                offerId: product.offer_id || null,
-              },
-            });
-          }
-
+          await this.upsertPosting(storeAccountId, posting, 'FBS');
           synced++;
         } catch (error: any) {
-          this.logger.error(`Failed to sync posting ${posting.posting_number}: ${error.message}`);
+          this.logger.error(`Failed to sync FBS posting ${posting.posting_number}: ${error.message}`);
           failed++;
         }
+      }
+
+      // Sync FBO orders
+      try {
+        const fboPostings = await this.ozonOrderApi.listAllFboPostingsSince(credentials, since, to);
+        this.logger.log(`Found ${fboPostings.length} FBO postings from ${since} to ${to}`);
+
+        for (const posting of fboPostings) {
+          try {
+            await this.upsertPosting(storeAccountId, posting, 'FBO');
+            synced++;
+          } catch (error: any) {
+            this.logger.error(`Failed to sync FBO posting ${posting.posting_number}: ${error.message}`);
+            failed++;
+          }
+        }
+      } catch (fboError: any) {
+        this.logger.warn(`FBO sync failed (non-fatal): ${fboError.message}`);
       }
 
       // Update store lastSyncAt
@@ -259,6 +225,68 @@ export class OrderService {
       this.logger.warn(`Analytics API failed: ${error.message}, falling back to local data`);
       // Fallback: compute from local order data
       return this.getLocalAnalytics(storeAccountId, dateFrom, dateTo);
+    }
+  }
+
+  private async upsertPosting(
+    storeAccountId: string,
+    posting: any,
+    orderType: string,
+  ) {
+    const totalAmount = posting.products.reduce(
+      (sum: number, p: any) => sum + parseFloat(p.price) * p.quantity,
+      0,
+    );
+
+    const statusMap: Record<string, OrderStatus> = {
+      awaiting_packaging: OrderStatus.AWAITING_PACKAGING,
+      awaiting_deliver: OrderStatus.AWAITING_DELIVER,
+      delivering: OrderStatus.DELIVERING,
+      delivered: OrderStatus.DELIVERED,
+      cancelled: OrderStatus.CANCELLED,
+      returned: OrderStatus.RETURNED,
+    };
+    const mappedStatus = statusMap[posting.status] || OrderStatus.AWAITING_PACKAGING;
+
+    const order = await this.prisma.order.upsert({
+      where: {
+        storeAccountId_ozonPostingNumber: {
+          storeAccountId,
+          ozonPostingNumber: posting.posting_number,
+        },
+      },
+      create: {
+        storeAccountId,
+        ozonPostingNumber: posting.posting_number,
+        orderStatus: mappedStatus,
+        orderType,
+        totalAmount,
+        trackingNumber: posting.tracking_number || null,
+        ozonCreatedAt: new Date(posting.created_at),
+      },
+      update: {
+        orderStatus: mappedStatus,
+        orderType,
+        totalAmount,
+        trackingNumber: posting.tracking_number || null,
+      },
+    });
+
+    await this.prisma.orderItem.deleteMany({
+      where: { orderId: order.id },
+    });
+
+    for (const product of posting.products) {
+      await this.prisma.orderItem.create({
+        data: {
+          orderId: order.id,
+          ozonSku: BigInt(product.sku),
+          name: product.name,
+          quantity: product.quantity,
+          price: parseFloat(product.price),
+          offerId: product.offer_id || null,
+        },
+      });
     }
   }
 

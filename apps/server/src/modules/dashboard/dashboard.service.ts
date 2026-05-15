@@ -18,6 +18,8 @@ export class DashboardService {
       joinedPromotions,
       pendingOrders,
       totalOrders,
+      totalReturns,
+      totalWarehouses,
       lastSync,
       recentLogs,
     ] = await Promise.all([
@@ -43,6 +45,8 @@ export class DashboardService {
         },
       }),
       this.prisma.order.count({ where: storeFilter }),
+      this.prisma.return.count({ where: storeFilter }),
+      this.prisma.warehouse.count({ where: storeFilter }),
       this.prisma.syncLog.findFirst({
         where: storeAccountId ? { storeAccountId } : {},
         orderBy: { completedAt: 'desc' },
@@ -51,7 +55,7 @@ export class DashboardService {
       this.prisma.syncLog.findMany({
         where: storeAccountId ? { storeAccountId } : {},
         orderBy: { startedAt: 'desc' },
-        take: 5,
+        take: 8,
         select: {
           id: true,
           syncType: true,
@@ -68,6 +72,8 @@ export class DashboardService {
       products: { total: totalProducts, onSale: onSaleProducts },
       promotions: { total: totalPromotions, joined: joinedPromotions },
       orders: { total: totalOrders, pending: pendingOrders },
+      returns: { total: totalReturns },
+      warehouses: { total: totalWarehouses },
       lastSync,
       recentSyncLogs: recentLogs,
     };

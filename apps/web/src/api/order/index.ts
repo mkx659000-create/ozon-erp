@@ -22,6 +22,7 @@ export interface Order {
   trackingNumber: string | null;
   customerName: string | null;
   customerRegion: string | null;
+  orderType: string;
   ozonCreatedAt: string;
   shipByDate: string | null;
   deliveredAt: string | null;
@@ -39,6 +40,7 @@ export interface OrderQuery {
   keyword?: string;
   dateFrom?: string;
   dateTo?: string;
+  orderType?: string;
 }
 
 export interface PaginatedResult<T> {

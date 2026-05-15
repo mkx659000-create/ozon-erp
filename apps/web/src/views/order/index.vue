@@ -15,6 +15,10 @@ import {
   message,
   Spin,
   Empty,
+  Select,
+  SelectOption,
+  RadioGroup,
+  RadioButton,
 } from 'ant-design-vue';
 import {
   SyncOutlined,
@@ -45,6 +49,7 @@ const currentPage = ref(1);
 const pageSize = ref(20);
 const keyword = ref('');
 const activeTab = ref('ALL');
+const orderTypeFilter = ref('');
 const statusCounts = ref<OrderStatusCounts>({ total: 0, statuses: [] });
 
 /* ---- drawer ---- */
@@ -75,6 +80,7 @@ const tabs = computed(() => {
 /* ---- columns ---- */
 const columns = [
   { title: '订单号', key: 'postingNumber', width: 200, fixed: 'left' as const },
+  { title: '类型', key: 'orderType', width: 70 },
   { title: '状态', key: 'status', width: 100 },
   { title: '商品', key: 'items', width: 300 },
   { title: '金额', key: 'amount', width: 120, align: 'right' as const },
@@ -94,6 +100,7 @@ async function fetchData() {
     };
     if (storeAccountId.value) params.storeAccountId = storeAccountId.value;
     if (activeTab.value !== 'ALL') params.status = activeTab.value;
+    if (orderTypeFilter.value) params.orderType = orderTypeFilter.value;
     if (keyword.value) params.keyword = keyword.value;
 
     const res = await getOrdersApi(params);
@@ -165,6 +172,7 @@ function handleSearch() {
 function handleReset() {
   keyword.value = '';
   activeTab.value = 'ALL';
+  orderTypeFilter.value = '';
   currentPage.value = 1;
   loadAll();
 }
@@ -232,6 +240,11 @@ watch(storeAccountId, () => {
 
     <!-- Search -->
     <div class="search-bar">
+      <RadioGroup v-model:value="orderTypeFilter" size="small" button-style="solid" @change="handleSearch">
+        <RadioButton value="">全部</RadioButton>
+        <RadioButton value="FBS">FBS</RadioButton>
+        <RadioButton value="FBO">FBO</RadioButton>
+      </RadioGroup>
       <Input
         v-model:value="keyword"
         placeholder="搜索订单号 / 物流单号"
@@ -272,6 +285,12 @@ watch(storeAccountId, () => {
           <a class="order-link" @click="viewOrder(record.id)">
             {{ record.ozonPostingNumber }}
           </a>
+        </template>
+
+        <template v-if="column.key === 'orderType'">
+          <Tag :color="record.orderType === 'FBO' ? 'purple' : 'geekblue'" style="margin: 0">
+            {{ record.orderType || 'FBS' }}
+          </Tag>
         </template>
 
         <template v-if="column.key === 'status'">
@@ -329,6 +348,11 @@ watch(storeAccountId, () => {
           <Descriptions bordered size="small" :column="2">
             <DescriptionsItem label="订单号" :span="2">
               <span style="font-weight: 500">{{ drawerOrder.ozonPostingNumber }}</span>
+            </DescriptionsItem>
+            <DescriptionsItem label="类型">
+              <Tag :color="drawerOrder.orderType === 'FBO' ? 'purple' : 'geekblue'" style="margin: 0">
+                {{ drawerOrder.orderType || 'FBS' }}
+              </Tag>
             </DescriptionsItem>
             <DescriptionsItem label="状态">
               <Tag :color="statusConfig[drawerOrder.orderStatus]?.color" style="margin: 0">

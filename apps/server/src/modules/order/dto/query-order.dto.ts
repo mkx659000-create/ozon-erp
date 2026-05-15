@@ -21,4 +21,8 @@ export class QueryOrderDto extends PaginationDto {
   @IsOptional()
   @IsString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  orderType?: string;
 }

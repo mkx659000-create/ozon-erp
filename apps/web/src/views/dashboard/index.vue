@@ -26,6 +26,10 @@ import {
   ArrowUpOutlined,
   RightOutlined,
   ShopOutlined,
+  DollarOutlined,
+  RollbackOutlined,
+  InboxOutlined,
+  StarOutlined,
 } from '@ant-design/icons-vue';
 import { useStoreAccountStore, useUserStore } from '@/store';
 import { getDashboardOverviewApi, type DashboardOverview } from '@/api/dashboard';
@@ -68,6 +72,12 @@ const syncTypeMap: Record<string, string> = {
   PROMOTION: '促销同步',
   ORDER: '订单同步',
   STOCK: '库存同步',
+  FINANCE: '财务同步',
+  RETURNS: '退货同步',
+  WAREHOUSE: '仓库同步',
+  RATING: '评分同步',
+  CATEGORY: '分类同步',
+  ANALYTICS: '分析同步',
 };
 
 const syncStatusConfig: Record<string, { color: string; label: string; icon: any }> = {
@@ -192,6 +202,64 @@ watch(storeAccountId, () => fetchOverview());
                 :value="lastSyncText"
                 :valueStyle="{ color: '#722ed1', fontSize: '20px', fontWeight: 600 }"
               />
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      <!-- Second Row Stats -->
+      <Row :gutter="[16, 16]" style="margin-bottom: 20px">
+        <Col :xs="24" :sm="12" :lg="6">
+          <Card class="stat-card" hoverable @click="router.push({ name: 'Finance' })">
+            <div class="stat-card-inner">
+              <div class="stat-icon" style="background: #fff1f0; color: #f5222d">
+                <DollarOutlined />
+              </div>
+              <div>
+                <div style="color: #8c8c8c; font-size: 13px">财务管理</div>
+                <div style="font-size: 16px; font-weight: 500; margin-top: 4px">交易 & 利润分析</div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col :xs="24" :sm="12" :lg="6">
+          <Card class="stat-card" hoverable @click="router.push({ name: 'Returns' })">
+            <div class="stat-card-inner">
+              <div class="stat-icon" style="background: #fff7e6; color: #fa8c16">
+                <RollbackOutlined />
+              </div>
+              <Statistic
+                title="退货记录"
+                :value="overview?.returns?.total ?? 0"
+                :valueStyle="{ color: '#fa8c16', fontSize: '28px', fontWeight: 600 }"
+              />
+            </div>
+          </Card>
+        </Col>
+        <Col :xs="24" :sm="12" :lg="6">
+          <Card class="stat-card" hoverable @click="router.push({ name: 'Warehouse' })">
+            <div class="stat-card-inner">
+              <div class="stat-icon" style="background: #e6fffb; color: #13c2c2">
+                <InboxOutlined />
+              </div>
+              <Statistic
+                title="仓库数量"
+                :value="overview?.warehouses?.total ?? 0"
+                :valueStyle="{ color: '#13c2c2', fontSize: '28px', fontWeight: 600 }"
+              />
+            </div>
+          </Card>
+        </Col>
+        <Col :xs="24" :sm="12" :lg="6">
+          <Card class="stat-card" hoverable @click="router.push({ name: 'Rating' })">
+            <div class="stat-card-inner">
+              <div class="stat-icon" style="background: #fffbe6; color: #fadb14">
+                <StarOutlined />
+              </div>
+              <div>
+                <div style="color: #8c8c8c; font-size: 13px">卖家评分</div>
+                <div style="font-size: 16px; font-weight: 500; margin-top: 4px">查看评分详情</div>
+              </div>
             </div>
           </Card>
         </Col>

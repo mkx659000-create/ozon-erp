@@ -26,25 +26,37 @@ export class PromotionController {
 
   constructor(private readonly promotionService: PromotionService) {}
 
-  /**
-   * GET /promotions — list promotion products with filters + pagination.
-   */
   @Get()
   findAll(@Query() query: QueryPromotionDto) {
     return this.promotionService.findPromotionProducts(query);
   }
 
-  /**
-   * GET /promotions/status-counts — participation status counts.
-   */
   @Get('status-counts')
   getStatusCounts(@Query('storeAccountId') storeAccountId?: string) {
     return this.promotionService.getStatusCounts(storeAccountId);
   }
 
-  /**
-   * GET /promotions/:id/products — products for the edit-activity modal.
-   */
+  @Get('activities')
+  findActivities(
+    @Query('storeAccountId') storeAccountId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.promotionService.findActivities(storeAccountId, status);
+  }
+
+  @Get('activities/:id')
+  findActivityById(@Param('id') id: string) {
+    return this.promotionService.findActivityById(id);
+  }
+
+  @Get('activities/:id/candidates')
+  getCandidateProducts(
+    @Param('id') id: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.promotionService.getCandidateProducts(id, keyword);
+  }
+
   @Get(':id/products')
   getEditActivityProducts(
     @Param('id') id: string,
@@ -60,9 +72,6 @@ export class PromotionController {
     );
   }
 
-  /**
-   * POST /promotions/sync — sync promotions from Ozon API.
-   */
   @Post('sync')
   async sync(@Body() dto: SyncPromotionDto) {
     try {
@@ -73,25 +82,16 @@ export class PromotionController {
     }
   }
 
-  /**
-   * POST /promotions/:id/join — join products to a promotion.
-   */
   @Post(':id/join')
   joinPromotion(@Param('id') id: string, @Body() dto: JoinPromotionDto) {
     return this.promotionService.joinPromotion(id, dto);
   }
 
-  /**
-   * POST /promotions/:id/exit — exit products from a promotion.
-   */
   @Post(':id/exit')
   exitPromotion(@Param('id') id: string, @Body() dto: ExitPromotionDto) {
     return this.promotionService.exitPromotion(id, dto);
   }
 
-  /**
-   * PATCH /promotions/:id/products — batch edit promo prices/discount/stock.
-   */
   @Patch(':id/products')
   batchEditProducts(
     @Param('id') _id: string,

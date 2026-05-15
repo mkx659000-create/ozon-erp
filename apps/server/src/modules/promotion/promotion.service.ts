@@ -166,6 +166,125 @@ export class PromotionService {
   }
 
   /**
+   * List promotions (activity-level view).
+   */
+  async findActivities(storeAccountId?: string, status?: string) {
+    const where: Prisma.PromotionWhereInput = {};
+    if (storeAccountId) where.storeAccountId = storeAccountId;
+    if (status) where.status = status as any;
+
+    const promotions = await this.prisma.promotion.findMany({
+      where,
+      orderBy: { startDate: 'desc' },
+      include: {
+        _count: { select: { products: true } },
+        storeAccount: { select: { id: true, storeName: true } },
+      },
+    });
+
+    return promotions.map((p) => ({
+      ...p,
+      ozonActionId: String(p.ozonActionId),
+      localProductsCount: p._count.products,
+    }));
+  }
+
+  /**
+   * Get single promotion detail with product summary.
+   */
+  async findActivityById(id: string) {
+    const promotion = await this.prisma.promotion.findUnique({
+      where: { id },
+      include: {
+        storeAccount: { select: { id: true, storeName: true } },
+        products: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                offerId: true,
+                ozonProductId: true,
+                primaryImage: true,
+                sellingPrice: true,
+                totalStock: true,
+                storeAccount: { select: { storeName: true } },
+                skus: { select: { ozonSku: true } },
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        },
+      },
+    });
+    if (!promotion) throw new NotFoundException('促销活动不存在');
+
+    const joined = promotion.products.filter((p) => p.participationStatus === 'JOINED').length;
+    const notJoined = promotion.products.filter((p) => p.participationStatus === 'NOT_JOINED').length;
+    const exited = promotion.products.filter((p) => p.participationStatus === 'EXITED').length;
+
+    return {
+      ...promotion,
+      ozonActionId: String(promotion.ozonActionId),
+      stats: { joined, notJoined, exited, total: promotion.products.length },
+    };
+  }
+
+  /**
+   * Get candidate products that can be added to a promotion (not yet in it).
+   */
+  async getCandidateProducts(promotionId: string, keyword?: string) {
+    const promotion = await this.prisma.promotion.findUnique({
+      where: { id: promotionId },
+    });
+    if (!promotion) throw new NotFoundException('促销活动不存在');
+
+    const existingProductIds = (
+      await this.prisma.promotionProduct.findMany({
+        where: { promotionId },
+        select: { productId: true },
+      })
+    ).map((p) => p.productId);
+
+    const where: Prisma.ProductWhereInput = {
+      storeAccountId: promotion.storeAccountId,
+      id: { notIn: existingProductIds },
+    };
+    if (keyword) {
+      where.OR = [
+        { name: { contains: keyword, mode: 'insensitive' } },
+        { offerId: { contains: keyword, mode: 'insensitive' } },
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      take: 100,
+      select: {
+        id: true,
+        name: true,
+        offerId: true,
+        ozonProductId: true,
+        primaryImage: true,
+        sellingPrice: true,
+        totalStock: true,
+        skus: { select: { ozonSku: true } },
+      },
+    });
+
+    return products;
+  }
+
+  private computeStatus(action: { date_start: string; date_end: string }) {
+    const now = new Date();
+    const start = new Date(action.date_start);
+    const end = new Date(action.date_end);
+    if (now < start) return 'UPCOMING';
+    if (now > end) return 'ENDED';
+    return 'ACTIVE';
+  }
+
+  /**
    * Sync promotions from Ozon API.
    */
   async syncFromOzon(storeAccountId: string) {
@@ -189,13 +308,30 @@ export class PromotionService {
     let failed = 0;
 
     try {
-      // Step 1: Get all actions from Ozon
       const actions = await this.ozonPromotionApi.listActions(credentials);
       this.logger.log(`Found ${actions.length} promotions on Ozon`);
 
       for (const action of actions) {
         try {
-          // Upsert the promotion
+          const computedStatus = this.computeStatus(action);
+
+          const promotionData = {
+            title: action.title,
+            startDate: new Date(action.date_start),
+            endDate: new Date(action.date_end),
+            freezeDate: action.freeze_date ? new Date(action.freeze_date) : null,
+            status: computedStatus,
+            discountType: action.discount_type || null,
+            discountValue: action.discount_value || null,
+            potentialProductsCount: action.potential_products_count || 0,
+            participatingProductsCount: action.participating_products_count || 0,
+            bannedProductsCount: action.banned_products_count || 0,
+            orderAmount: action.order_amount || null,
+            isParticipating: action.is_participating || false,
+            participationType: action.with_targeting ? 'AUTO' : 'MANUAL',
+            lastSyncAt: new Date(),
+          };
+
           const promotion = await this.prisma.promotion.upsert({
             where: {
               storeAccountId_ozonActionId: {
@@ -206,62 +342,51 @@ export class PromotionService {
             create: {
               storeAccountId,
               ozonActionId: BigInt(action.id),
-              title: action.title,
-              startDate: new Date(action.date_start),
-              endDate: new Date(action.date_end),
-              status: new Date(action.date_end) > new Date() ? 'ACTIVE' : 'ENDED',
-              lastSyncAt: new Date(),
-            },
-            update: {
-              title: action.title,
-              startDate: new Date(action.date_start),
-              endDate: new Date(action.date_end),
-              status: new Date(action.date_end) > new Date() ? 'ACTIVE' : 'ENDED',
-              lastSyncAt: new Date(),
-            },
+              ...promotionData,
+            } as any,
+            update: promotionData as any,
           });
 
-          // Step 2: Get products in this action
+          // Get products in this action
           const actionProducts = await this.ozonPromotionApi.getActionProducts(
             credentials,
             action.id,
           );
 
+          // Batch find local products
+          const ozonProductIds = actionProducts.map((ap) => BigInt(ap.id));
+          const localProducts = await this.prisma.product.findMany({
+            where: {
+              storeAccountId,
+              ozonProductId: { in: ozonProductIds },
+            },
+            select: { id: true, ozonProductId: true },
+          });
+          const productMap = new Map(localProducts.map((p) => [String(p.ozonProductId), p.id]));
+
           for (const ap of actionProducts) {
-            // Find the local product by ozonProductId
-            const localProduct = await this.prisma.product.findFirst({
-              where: {
-                storeAccountId,
-                ozonProductId: BigInt(ap.id),
-              },
-            });
+            const localProductId = productMap.get(String(ap.id));
+            if (!localProductId) continue;
 
-            if (!localProduct) continue;
-
+            const isJoined = ap.action_price > 0 && ap.stock > 0;
             await this.prisma.promotionProduct.upsert({
               where: {
                 promotionId_productId: {
                   promotionId: promotion.id,
-                  productId: localProduct.id,
+                  productId: localProductId,
                 },
               },
               create: {
                 promotionId: promotion.id,
-                productId: localProduct.id,
-                participationStatus:
-                  ap.action_price > 0
-                    ? ParticipationStatus.JOINED
-                    : ParticipationStatus.NOT_JOINED,
+                productId: localProductId,
+                participationStatus: isJoined ? ParticipationStatus.JOINED : ParticipationStatus.NOT_JOINED,
                 originalPrice: ap.price,
                 lowestPromoPrice: ap.max_action_price,
                 promoPrice: ap.action_price > 0 ? ap.action_price : null,
                 promoStock: ap.stock,
               },
               update: {
-                participationStatus:
-                  ap.action_price > 0
-                    ? ParticipationStatus.JOINED
-                    : ParticipationStatus.NOT_JOINED,
+                participationStatus: isJoined ? ParticipationStatus.JOINED : ParticipationStatus.NOT_JOINED,
                 originalPrice: ap.price,
                 lowestPromoPrice: ap.max_action_price,
                 promoPrice: ap.action_price > 0 ? ap.action_price : null,

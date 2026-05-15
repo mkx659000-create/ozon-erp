@@ -1,5 +1,45 @@
 import request from '../request';
 
+/* ============ Activity Types ============ */
+
+export interface PromotionActivity {
+  id: string;
+  storeAccountId: string;
+  ozonActionId: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  freezeDate: string | null;
+  status: string;
+  discountType: string | null;
+  discountValue: number | null;
+  potentialProductsCount: number;
+  participatingProductsCount: number;
+  bannedProductsCount: number;
+  orderAmount: number | null;
+  isParticipating: boolean;
+  participationType: string | null;
+  lastSyncAt: string | null;
+  localProductsCount: number;
+  storeAccount?: { id: string; storeName: string };
+}
+
+export interface ActivityDetail extends PromotionActivity {
+  products: PromotionProduct[];
+  stats: { joined: number; notJoined: number; exited: number; total: number };
+}
+
+export interface CandidateProduct {
+  id: string;
+  name: string;
+  offerId: string;
+  ozonProductId: string;
+  primaryImage: string | null;
+  sellingPrice: number | null;
+  totalStock: number | null;
+  skus: Array<{ ozonSku: string }>;
+}
+
 /* ============ Types ============ */
 
 export interface PromotionProduct {
@@ -138,4 +178,24 @@ export function batchEditPromotionProductsApi(
   products: EditProductItem[],
 ) {
   return request.patch(`/promotions/${promotionId}/products`, { products });
+}
+
+/** Get activities list */
+export function getActivitiesApi(storeAccountId?: string, status?: string) {
+  return request.get<any, PromotionActivity[]>('/promotions/activities', {
+    params: { storeAccountId, status },
+  });
+}
+
+/** Get activity detail */
+export function getActivityDetailApi(id: string) {
+  return request.get<any, ActivityDetail>(`/promotions/activities/${id}`);
+}
+
+/** Get candidate products for joining a promotion */
+export function getCandidateProductsApi(promotionId: string, keyword?: string) {
+  return request.get<any, CandidateProduct[]>(
+    `/promotions/activities/${promotionId}/candidates`,
+    { params: keyword ? { keyword } : {} },
+  );
 }

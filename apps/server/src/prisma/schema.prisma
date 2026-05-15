@@ -192,18 +192,26 @@ enum PriceRuleType {
 // ===================== PROMOTIONS =====================
 
 model Promotion {
-  id                String                     @id @default(uuid())
-  storeAccountId    String                     @map("store_account_id")
-  ozonActionId      BigInt                     @map("ozon_action_id")
-  title             String
-  description       String?
-  startDate         DateTime                   @map("start_date")
-  endDate           DateTime                   @map("end_date")
-  status            PromotionStatus            @default(ACTIVE)
-  participationType PromotionParticipationType @default(MANUAL) @map("participation_type")
-  lastSyncAt        DateTime?                  @map("last_sync_at")
-  createdAt         DateTime                   @default(now()) @map("created_at")
-  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  id                       String                     @id @default(uuid())
+  storeAccountId           String                     @map("store_account_id")
+  ozonActionId             BigInt                     @map("ozon_action_id")
+  title                    String
+  description              String?
+  startDate                DateTime                   @map("start_date")
+  endDate                  DateTime                   @map("end_date")
+  freezeDate               DateTime?                  @map("freeze_date")
+  status                   PromotionStatus            @default(ACTIVE)
+  participationType        PromotionParticipationType @default(MANUAL) @map("participation_type")
+  discountType             String?                    @map("discount_type")
+  discountValue            Decimal?                   @map("discount_value") @db.Decimal(5, 2)
+  potentialProductsCount   Int                        @default(0) @map("potential_products_count")
+  participatingProductsCount Int                      @default(0) @map("participating_products_count")
+  bannedProductsCount      Int                        @default(0) @map("banned_products_count")
+  orderAmount              Decimal?                   @map("order_amount") @db.Decimal(12, 2)
+  isParticipating          Boolean                    @default(false) @map("is_participating")
+  lastSyncAt               DateTime?                  @map("last_sync_at")
+  createdAt                DateTime                   @default(now()) @map("created_at")
+  updatedAt                DateTime                   @updatedAt @map("updated_at")
 
   storeAccount StoreAccount       @relation(fields: [storeAccountId], references: [id])
   products     PromotionProduct[]

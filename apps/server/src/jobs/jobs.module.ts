@@ -15,6 +15,7 @@ import { FinanceModule } from '../modules/finance/finance.module';
 import { ReturnsModule } from '../modules/returns/returns.module';
 import { RatingModule } from '../modules/rating/rating.module';
 import { OrderModule } from '../modules/order/order.module';
+import { PromotionModule } from '../modules/promotion/promotion.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { OrderModule } from '../modules/order/order.module';
     ),
 
     ProductModule,
+    PromotionModule,
     FinanceModule,
     ReturnsModule,
     RatingModule,

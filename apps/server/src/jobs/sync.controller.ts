@@ -59,6 +59,22 @@ export class SyncController {
     return { jobId: job.id, message: '退货同步任务已启动' };
   }
 
+  @Post('all')
+  async triggerAllSync(@Body() dto: TriggerSyncDto) {
+    const jobs = await Promise.all([
+      this.syncScheduler.triggerProductSync(dto.storeAccountId),
+      this.syncScheduler.triggerStockSync(dto.storeAccountId),
+      this.syncScheduler.triggerPromotionSync(dto.storeAccountId),
+      this.syncScheduler.triggerFinanceSync(dto.storeAccountId),
+      this.syncScheduler.triggerReturnsSync(dto.storeAccountId),
+      this.syncScheduler.triggerRatingSync(dto.storeAccountId),
+    ]);
+    return {
+      jobIds: jobs.map((j) => j.id),
+      message: '全部同步任务已启动',
+    };
+  }
+
   /**
    * GET /sync/status — get sync job status for a store.
    */

@@ -66,6 +66,13 @@ export function triggerReturnsSyncApi(storeAccountId: string) {
   });
 }
 
+/** Trigger all sync types at once */
+export function triggerAllSyncApi(storeAccountId: string) {
+  return request.post<any, { jobIds: string[]; message: string }>('/sync/all', {
+    storeAccountId,
+  });
+}
+
 /** Refresh sync schedule */
 export function refreshSyncScheduleApi() {
   return request.post<any, { message: string }>('/sync/refresh-schedule');

@@ -27,6 +27,7 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   EyeInvisibleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons-vue';
 import {
   getStoreAccountsApi,
@@ -35,6 +36,7 @@ import {
   testConnectionApi,
   type StoreAccount,
 } from '@/api/store-account/index';
+import { triggerAllSyncApi } from '@/api/sync';
 import { useStoreAccountStore } from '@/store';
 import dayjs from 'dayjs';
 
@@ -45,6 +47,7 @@ const showModal = ref(false);
 const formLoading = ref(false);
 const form = ref({ storeName: '', ozonClientId: '', ozonApiKey: '' });
 const testingId = ref<string | null>(null);
+const syncingId = ref<string | null>(null);
 
 const columns = [
   { title: '店铺名称', key: 'storeName', width: 180 },
@@ -52,7 +55,7 @@ const columns = [
   { title: '状态', key: 'status', width: 100, align: 'center' as const },
   { title: '同步状态', key: 'syncEnabled', width: 100, align: 'center' as const },
   { title: '最后同步', key: 'lastSyncAt', width: 180 },
-  { title: '操作', key: 'action', width: 200 },
+  { title: '操作', key: 'action', width: 280 },
 ];
 
 async function fetchStores() {
@@ -104,6 +107,18 @@ async function handleDelete(id: string) {
     await storeAccountStore.fetchStores();
   } catch {
     // handled by interceptor
+  }
+}
+
+async function handleSyncAll(id: string) {
+  syncingId.value = id;
+  try {
+    const res = await triggerAllSyncApi(id);
+    message.success(res.message || '全部同步任务已启动');
+  } catch {
+    message.error('同步请求失败');
+  } finally {
+    syncingId.value = null;
   }
 }
 
@@ -207,11 +222,22 @@ onMounted(fetchStores);
           <Space :size="8">
             <Button
               size="small"
+              type="primary"
+              ghost
+              :loading="syncingId === record.id"
+              @click="handleSyncAll(record.id)"
+              :disabled="record.status !== 'ACTIVE'"
+            >
+              <template #icon><SyncOutlined /></template>
+              全量同步
+            </Button>
+            <Button
+              size="small"
               :loading="testingId === record.id"
               @click="handleTestConnection(record.id)"
             >
               <template #icon><ApiOutlined /></template>
-              测试连接
+              测试
             </Button>
             <Popconfirm
               title="确定删除此店铺？"
